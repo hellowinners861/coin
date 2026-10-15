@@ -4,15 +4,78 @@ import RAPIER from '@dimforge/rapier3d-compat';
 import { Game } from '../src/game.ts';
 import { MedalFeed } from '../src/feed.ts';
 import { Simulation, v } from '../src/physics.ts';
-import { D, INITIAL_COINS, LIMIT, THICKNESS, TOWER } from '../src/config.ts';
+import { D, INITIAL_COINS, LIMIT, MINI_BALL_RADIUS, REWARD_SHOOTER, THICKNESS, TOWER } from '../src/config.ts';
 
 await RAPIER.init();
 function empty(s:Simulation) {for(const a of s.actors)s.world.removeRigidBody(s.body(a));s.actors=[];}
 
 test('initial board has the tuned medal population and one ball',()=>{
   const s=new Simulation(new Game(undefined,123));
-  try {assert.equal(s.coins(),INITIAL_COINS);assert.equal(s.balls(),1);assert.ok(s.actors.every(a=>s.body(a).isDynamic()));}
+  try {
+    assert.equal(s.coins(),INITIAL_COINS);assert.equal(s.balls(),1);assert.equal(s.miniBalls(),3);
+    assert.ok(s.actors.every(a=>s.body(a).isDynamic()));
+    const covered=s.actors.filter(a=>a.kind==='coin').map(a=>s.position(a))
+      .filter(p=>Math.abs(p.x-TOWER.x)<TOWER.half&&Math.abs(p.z-TOWER.z)<TOWER.half);
+    assert.ok(covered.length>5,'tower lift is artificially empty at start');
+  }
   finally{s.dispose();}
+});
+
+test('a small physical ball is collected once and queues ten medals after restore',()=>{
+  const g=new Game(undefined,123),s=new Simulation(g);empty(s);
+  const mini=s.spawn('miniBall',v(0,-.3,-.1),'test',undefined,v(0,0,-2));
+  assert.ok(Math.abs((s.body(mini).collider(0).shape as RAPIER.Ball).radius-MINI_BALL_RADIUS)<1e-6);
+  s.step();
+  const copy=new Game(g.export()),resumed=new Simulation(copy,s.export());
+  try {
+    for(let n=0;n<100;n++)resumed.step();
+    assert.equal(resumed.miniBalls(),0);assert.equal(copy.state.miniBallsCollected,1);
+    assert.equal(copy.state.payouts[0].remaining,10);assert.equal(copy.state.balls,0);
+    assert.equal(copy.state.won,0);assert.equal(copy.state.wallet,100);
+    assert.equal(resumed.anomaly,'');
+  }finally{s.dispose();resumed.dispose();}
+});
+
+test('side rewards wait for forward shelf, hold it, and preserve remaining shots on restore',()=>{
+  const g=new Game(undefined,123),s=new Simulation(g);empty(s);g.payout(10);
+  let first=false;
+  try {
+    for(let n=0;n<400;n++) {
+      const before=s.coins();s.step();assert.equal(s.anomaly,'');
+      if(s.coins()>before) {
+        const a=s.actors.at(-1)!;
+        assert.equal(a.source,'fieldReward');
+        assert.ok(Math.abs(s.pusher.translation().z-10.8)<.001);
+        assert.ok(s.position(a).x>REWARD_SHOOTER.x&&s.position(a).z>16);
+        first=true;
+      }
+      if(s.time<1.49)assert.equal(s.coins(),0);
+    }
+    assert.equal(first,true);assert.equal(s.rewardHolding,true);
+    const copy=new Game(g.export()),resumed=new Simulation(copy,s.export());
+    try {
+      assert.equal(resumed.pusherTime,s.pusherTime);
+      for(let n=0;n<700;n++){resumed.step();assert.equal(resumed.anomaly,'');}
+      assert.equal(copy.state.payouts.length,0);assert.equal(resumed.coins(),10);
+      assert.equal(copy.state.wallet,100);assert.equal(copy.state.won,0);
+      assert.equal(resumed.rewardHolding,false);assert.ok(resumed.pusherTime>s.pusherTime);
+      assert.ok(resumed.actors.every(a=>resumed.position(a).z>14),'shots did not stay near the rear');
+    }finally{resumed.dispose();}
+  }finally{s.dispose();}
+});
+
+test('a blocked side feeder releases the pusher and retains the full payout',()=>{
+  const g=new Game(undefined,123),s=new Simulation(g);empty(s);g.payout(10);
+  const blocker=s.spawn('ball',v(REWARD_SHOOTER.x,REWARD_SHOOTER.y,REWARD_SHOOTER.z),'obstruction');
+  s.body(blocker).setBodyType(RAPIER.RigidBodyType.Fixed,true);
+  try {
+    for(let n=0;n<1000;n++){s.step();assert.equal(s.anomaly,'');}
+    assert.equal(g.state.payouts[0].remaining,10);assert.equal(s.coins(),0);
+    assert.equal(s.rewardHolding,false);assert.ok(s.pusherTime>1.6);
+    s.world.removeRigidBody(s.body(blocker));s.actors=[];
+    for(let n=0;n<1100;n++){s.step();assert.equal(s.anomaly,'');}
+    assert.equal(g.state.payouts.length,0);assert.equal(s.coins(),10);
+  }finally{s.dispose();}
 });
 
 test('opening piles vary with layout seed without consuming lottery randomness',()=>{

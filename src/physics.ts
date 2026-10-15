@@ -1,12 +1,12 @@
 import RAPIER from '@dimforge/rapier3d-compat';
-import { CAPACITY, D, DT, INITIAL_COINS, LIMIT, METRES_PER_UNIT, PUSHER_PERIOD, THICKNESS, TOWER } from './config';
+import { CAPACITY, D, DT, INITIAL_COINS, LIMIT, METRES_PER_UNIT, MINI_BALL_LIMIT, MINI_BALL_RADIUS, PUSHER_PERIOD, REWARD_SHOOTER, THICKNESS, TOWER } from './config';
 import type { Game } from './game';
 
 export type V = { x: number; y: number; z: number };
 export type Q = { x: number; y: number; z: number; w: number };
 export type Part = { size: V; at: V; rotation?: Q; material: 'steel' | 'upper' | 'green' | 'dark' | 'glass' | 'brass'; group?: 'pusher' | 'rail' | 'lift' | 'cage'; };
 export type Actor = {
-  id: number; handle: number; kind: 'coin' | 'ball'; source: string; tower?: number;
+  id: number; handle: number; kind: 'coin' | 'ball' | 'miniBall'; source: string; tower?: number;
   departedFront?: boolean;
   previous: V; previousQ: Q;
 };
@@ -16,6 +16,7 @@ export type PhysicsSave = {
   nextId: number; pusher: number; rail: number; lift: number; cage: number;
   towerPhase: TowerPhase; towerTime: number; towerId: number; towerBorn: number;
   payoutClock: number; ballClock: number; collisions: number;
+  pusherTime?: number; rewardHolding?: boolean; miniBallClock?: number; rewardWait?: number;
 };
 export const v = (x: number, y: number, z: number): V => ({ x, y, z });
 const enginePoint = (p: V) => v(p.x * D, p.y * D, p.z * D);
@@ -84,6 +85,7 @@ export class Simulation {
   actors: Actor[] = [];
   parts = machineParts();
   time = 0; angle = 0; targetAngle = 0; nextId = 1;
+  pusherTime = 0; rewardHolding = false; miniBallClock = 0; rewardWait = 0;
   pusher: RAPIER.RigidBody; rail: RAPIER.RigidBody; lift: RAPIER.RigidBody; cage: RAPIER.RigidBody;
   towerPhase: TowerPhase = 'idle'; towerTime = 0; towerId = 0; towerBorn = 0;
   payoutClock = 0; ballClock = 0; collisions = 0; anomaly = '';
@@ -95,6 +97,9 @@ export class Simulation {
       this.world = RAPIER.World.restoreSnapshot(saved.world);
       this.actors = structuredClone(saved.actors);
       this.time = saved.time; this.angle = saved.angle; this.targetAngle = saved.targetAngle;
+      this.pusherTime=saved.pusherTime??saved.time;
+      this.rewardHolding=saved.rewardHolding??false;this.miniBallClock=saved.miniBallClock??0;
+      this.rewardWait=saved.rewardWait??0;
       this.nextId = saved.nextId;
       this.pusher = this.world.getRigidBody(saved.pusher);
       this.rail = this.world.getRigidBody(saved.rail);
@@ -137,6 +142,7 @@ export class Simulation {
   body(a: Actor) { return this.world.getRigidBody(a.handle); }
   coins() { return this.actors.filter(a=>a.kind==='coin').length; }
   balls() { return this.actors.filter(a=>a.kind==='ball').length; }
+  miniBalls() { return this.actors.filter(a=>a.kind==='miniBall').length; }
   hasCapacity(n = 1) { return this.coins()+this.reserved+n <= CAPACITY; }
   position(a: Actor): V { const p=this.body(a).translation(); return v(p.x/D,p.y/D,p.z/D); }
   export(): PhysicsSave {
@@ -146,6 +152,8 @@ export class Simulation {
       pusher:this.pusher.handle,rail:this.rail.handle,lift:this.lift.handle,cage:this.cage.handle,
       towerPhase:this.towerPhase,towerTime:this.towerTime,towerId:this.towerId,towerBorn:this.towerBorn,
       payoutClock:this.payoutClock,ballClock:this.ballClock,collisions:this.collisions,
+      pusherTime:this.pusherTime,rewardHolding:this.rewardHolding,miniBallClock:this.miniBallClock,
+      rewardWait:this.rewardWait,
     };
   }
   spawn(kind: Actor['kind'], p: V, source: string, rotation=defaultRotation, velocity=v(0,0,0), tower?: number) {
@@ -155,7 +163,8 @@ export class Simulation {
       .setLinearDamping(.025).setAngularDamping(.045).setCcdEnabled(true));
     const collider = kind==='coin'
       ? RAPIER.ColliderDesc.roundCylinder(THICKNESS*D/2-.004,.5*D-.004,.004).setMass(.005).setFriction(.45)
-      : RAPIER.ColliderDesc.ball(1.1*D).setMass(.012).setFriction(.3);
+      : RAPIER.ColliderDesc.ball((kind==='miniBall'?MINI_BALL_RADIUS:1.1)*D)
+        .setMass(kind==='miniBall'?.002:.012).setFriction(kind==='miniBall'?.12:.3);
     collider.setRestitution(.05).setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS);
     this.world.createCollider(collider,b);
     if(tower) b.setAdditionalSolverIterations(4);
@@ -173,16 +182,14 @@ export class Simulation {
     for(let row=0;row<13;row++) for(let col=0;col<13;col++) {
       const p=v((col-6)*1.005+(row%2)*.5025+(random()-.5)*.012,THICKNESS/2+.004,.08+row*.885+(random()-.5)*.012);
       if(p.x>6.45)continue;
-      if(Math.abs(p.x-TOWER.x)<TOWER.half+.9 && Math.abs(p.z-TOWER.z)<TOWER.half+.9)continue;
       this.spawn('coin',p,'initial',yaw(random()*Math.PI*2));lowerBase++;
     }
-    const scatter=(count:number, rear:boolean)=>{
-      let layer=rear?0:1, positions:V[]=[];
+    const scatter=(count:number, rear:boolean, firstLayer=rear?0:1)=>{
+      let layer=firstLayer, positions:V[]=[];
       for(let i=0;i<count;i++) {
         let p:V|undefined;
         for(let attempt=0;attempt<700;attempt++) {
-          const candidate=v((random()-.5)*12.7,0,rear?12.16+random()*4.8:.55+random()*10.55);
-          if(!rear && Math.abs(candidate.x-TOWER.x)<TOWER.half+.9 && Math.abs(candidate.z-TOWER.z)<TOWER.half+.9)continue;
+          const candidate=v((random()-.5)*12.7,0,rear?12.16+random()*4.8:.8+random()*10.3);
           if(positions.every(q=>Math.hypot(q.x-candidate.x,q.z-candidate.z)>1.015)) {p=candidate;break;}
         }
         if(!p) {layer++;positions=[];i--;continue;}
@@ -192,12 +199,17 @@ export class Simulation {
         const rotation={x:Math.sin(tilt/2)*Math.cos(angle/2),y:Math.cos(tilt/2)*Math.sin(angle/2),z:-Math.sin(tilt/2)*Math.sin(angle/2),w:Math.cos(tilt/2)*Math.cos(angle/2)};
         this.spawn('coin',p,'initial',rotation);
       }
+      return layer+1;
     };
-    // Most of the extra opening medals belong on the collection deck, rather
-    // than banking them behind the upper shelf's moving edge.
-    const lower=Math.round(INITIAL_COINS*.75);
-    scatter(lower-lowerBase,false);scatter(INITIAL_COINS-lower,true);
+    // Build the base bank before adding separate loose layers, so additional
+    // medals never start interpenetrating an already populated layer.
+    const bank=Math.min(INITIAL_COINS,360),lower=Math.round(bank*.7);
+    const nextLower=scatter(lower-lowerBase,false);
+    const nextUpper=scatter(bank-lower,true);
+    const extra=INITIAL_COINS-bank,extraLower=Math.round(extra*.7);
+    scatter(extraLower,false,nextLower);scatter(extra-extraLower,true,nextUpper);
     this.spawn('ball',v(-3.7,1.18,4.1),'initial');
+    for(const p of [v(-5,.8,1.5),v(0,.8,3.5),v(5.2,.8,5)])this.spawn('miniBall',p,'initial');
     // Let the initial arrangement settle on the stationary machine.
     for(let n=0;n<100;n++) this.world.step();
     for(const a of this.actors) { a.previous=this.position(a); a.previousQ={...this.body(a).rotation()}; }
@@ -215,12 +227,18 @@ export class Simulation {
     const q={x:Math.sin(a/2)*Math.SQRT1_2,y:Math.sin(a/2)*Math.SQRT1_2,z:Math.cos(a/2)*Math.SQRT1_2,w:Math.cos(a/2)*Math.SQRT1_2};
     const coin=this.spawn('coin',this.inputPoint(),'player',q,v(s*5,-.78,c*5));
     this.body(coin).setAngvel(v(c*10,0,-s*10),true);
-    this.game.spend(this.balls());
+    this.game.spend(this.balls(),this.miniBalls());
     return true;
   }
   setAngle(angle: number) { this.targetAngle=Math.max(-LIMIT,Math.min(LIMIT,angle)); }
   private clearArea(x: number,z: number,half: number,above=-1) {
-    return !this.actors.some(a=>{const p=this.position(a);const r=a.kind==='ball'?1.1:.5;return p.y>above&&Math.abs(p.x-x)<half+r&&Math.abs(p.z-z)<half+r;});
+    return !this.actors.some(a=>{const p=this.position(a);const r=a.kind==='ball'?1.1:a.kind==='miniBall'?MINI_BALL_RADIUS:.5;return p.y>above&&Math.abs(p.x-x)<half+r&&Math.abs(p.z-z)<half+r;});
+  }
+  private clearSpawn(p: V, radius: number) {
+    return !this.actors.some(a=>{
+      const q=this.position(a),r=a.kind==='ball'?1.1:a.kind==='miniBall'?MINI_BALL_RADIUS:.51;
+      return Math.hypot(q.x-p.x,q.y-p.y,q.z-p.z)<radius+r+.02;
+    });
   }
   private tickTower() {
     const phase=this.towerPhase;
@@ -265,23 +283,32 @@ export class Simulation {
     }
   }
   private tickRewards() {
-    this.payoutClock-=DT;this.ballClock-=DT;
+    this.payoutClock-=DT;this.ballClock-=DT;this.miniBallClock-=DT;
     const s=this.game.state;
     const payout=s.payouts[0];
-    if(payout && this.payoutClock<=0 && this.hasCapacity()) {
-      const x=(this.game.random[3].next()-.5)*11;
+    if(payout && this.rewardHolding && this.payoutClock<=0 && this.hasCapacity()) {
       // Do not spawn a reward inside another object.
-      const p=v(x,3.0,16.2);
-      if(!this.actors.some(a=>{const q=this.position(a);return Math.hypot(q.x-p.x,q.y-p.y,q.z-p.z)<.7;})) {
-        this.spawn('coin',p,payout.total===300?'jackpot':'fieldReward');
-        payout.remaining--;this.payoutClock=1/12;
-        if(payout.remaining===0) {s.payouts.shift();this.game.onDurableChange();}
+      const p=v(REWARD_SHOOTER.x,REWARD_SHOOTER.y,REWARD_SHOOTER.z);
+      if(this.clearSpawn(p,.51)) {
+        const speed=12+this.game.random[3].next()*24;
+        this.spawn('coin',p,payout.total===300?'jackpot':'fieldReward',yaw(this.game.random[3].next()*Math.PI*2),v(speed,1.2,.4));
+        payout.remaining--;this.payoutClock=REWARD_SHOOTER.interval;
+        this.rewardWait=0;
+        if(payout.remaining===0) {s.payouts.shift();this.payoutClock=.35;}
+        this.game.onDurableChange();
       }
     }
     if(s.ballJobs && this.balls()<3 && this.ballClock<=0) {
       const p=v(-5.5,3.7,16);
-      if(!this.actors.some(a=>{const q=this.position(a);return Math.hypot(q.x-p.x,q.y-p.y,q.z-p.z)<1.7;})) {
+      if(this.clearSpawn(p,1.1)) {
         this.spawn('ball',p,'reward');s.ballJobs--;this.ballClock=2;this.game.onDurableChange();
+      }
+    }
+    if(s.miniBallJobs && this.miniBalls()<MINI_BALL_LIMIT && this.miniBallClock<=0) {
+      const p=v(5.8,2.6,15.2);
+      if(this.clearSpawn(p,MINI_BALL_RADIUS)) {
+        this.spawn('miniBall',p,'reward');s.miniBallJobs--;this.miniBallClock=2;
+        this.game.onDurableChange();
       }
     }
     this.tickTower();
@@ -291,7 +318,18 @@ export class Simulation {
     const diff=this.targetAngle-this.angle;
     this.angle+=Math.max(-DT*.8,Math.min(DT*.8,diff));
     this.rail.setNextKinematicRotation(yaw(this.angle));
-    const front=11.4+.6*Math.cos(this.time*Math.PI*2/PUSHER_PERIOD);
+    // Wait for a natural forward stroke, then hold the shelf while the side
+    // feeder fires. The separate phase clock keeps automatic player feed in
+    // sync after releasing the shelf; ordinary physics time never stops.
+    const nextForward=(Math.floor((this.pusherTime-PUSHER_PERIOD/2)/PUSHER_PERIOD)+1)*PUSHER_PERIOD+PUSHER_PERIOD/2;
+    if(this.rewardHolding)this.rewardWait+=DT;
+    if(this.rewardHolding && ((!this.game.state.payouts.length && this.payoutClock<=0)||this.rewardWait>2))this.rewardHolding=false;
+    if(!this.rewardHolding) {
+      if(this.game.state.payouts.length && this.hasCapacity() && this.pusherTime+DT>=nextForward) {
+        this.pusherTime=nextForward;this.rewardHolding=true;this.rewardWait=0;
+      } else this.pusherTime+=DT;
+    }
+    const front=11.4+.6*Math.cos(this.pusherTime*Math.PI*2/PUSHER_PERIOD);
     this.pusher.setNextKinematicTranslation(enginePoint(v(0,0,front)));
     this.tickRewards();
     for(const a of this.actors) {
@@ -321,7 +359,9 @@ export class Simulation {
     for(const a of collected) {
       this.world.removeRigidBody(this.body(a));
       const index=this.actors.indexOf(a);this.actors.splice(index,1);
-      if(a.kind==='coin')this.game.collectCoin();else this.game.collectBall();
+      if(a.kind==='coin')this.game.collectCoin();
+      else if(a.kind==='miniBall')this.game.collectMiniBall();
+      else this.game.collectBall();
     }
     this.game.tick(DT);
   }

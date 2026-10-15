@@ -12,7 +12,7 @@ export function automaticLaunchPhase(count: 1 | 3) {
 export class MedalFeed {
   automatic = false;
   private lastAutomaticCycle = -1;
-  constructor(private game: Game, private sim: Pick<Simulation, 'time' | 'angle' | 'targetAngle' | 'insert'>) {
+  constructor(private game: Game, private sim: Pick<Simulation, 'time' | 'angle' | 'targetAngle' | 'insert'> & Partial<Pick<Simulation,'pusherTime'>>) {
     // Reloading never starts spending automatically. Unlaunched automatic
     // medals are not charged; an accepted manual burst resumes normally.
     if(game.state.feedQueue?.automatic)game.state.feedQueue=null;
@@ -36,13 +36,14 @@ export class MedalFeed {
       if(s.feedQueue){s.feedQueue=null;this.game.onDurableChange();}
       return;
     }
-    const cycle=Math.floor(t/PUSHER_PERIOD),phase=t-cycle*PUSHER_PERIOD;
+    const pusherTime=this.sim.pusherTime??t;
+    const cycle=Math.floor(pusherTime/PUSHER_PERIOD),phase=pusherTime-cycle*PUSHER_PERIOD;
     const launch=automaticLaunchPhase(s.batchSize);
     if(this.automatic&&!s.feedQueue&&cycle!==this.lastAutomaticCycle&&
       phase+1e-8>=launch&&phase<launch+AUTO_WINDOW&&Math.abs(this.sim.targetAngle-this.sim.angle)<.01) {
       this.lastAutomaticCycle=cycle;
       s.feedQueue={remaining:Math.min(s.batchSize,s.wallet),nextAt:t,automatic:true,
-        deadline:cycle*PUSHER_PERIOD+launch+(s.batchSize-1)*FEED_INTERVAL+AUTO_WINDOW};
+        deadline:t+(launch-phase)+(s.batchSize-1)*FEED_INTERVAL+AUTO_WINDOW};
       this.game.onDurableChange();
     }
     const queue=s.feedQueue;
