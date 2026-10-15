@@ -17,11 +17,13 @@ export function draw(rng: Random, table: readonly [Result, number][]): Result {
 }
 export type Ticket = { id: number; kind: 'normal' | 'jpc'; result?: Result; elapsed: number; applied: boolean };
 export type Payout = { id: number; remaining: number; total: number };
+export type FeedQueue = { remaining: number; nextAt: number; automatic: boolean; deadline: number | null };
 export type GameState = {
   wallet: number; won: number; paid: number; direct: number; gauge: number; balls: number;
   inputRemainder: number; ballJobs: number; towerJobs: number; jackpots: number;
   queue: Ticket[]; active: Ticket | null; payouts: Payout[]; nextId: number;
   random: number[]; muted: boolean; bgm: boolean; refilled: number; vibration: boolean; quality: 'high' | 'low';
+  batchSize: 1 | 3; feedQueue: FeedQueue | null; feedReadyAt: number;
 };
 export class Game {
   state: GameState;
@@ -30,12 +32,14 @@ export class Game {
   onSound: (type: string) => void = () => {};
   onDurableChange: () => void = () => {};
   constructor(saved?: GameState, seed = Date.now()) {
-    this.state = saved ? { ...saved, bgm: saved.bgm ?? true, refilled: saved.refilled ?? 0 } : {
+    this.state = saved ? { ...saved, bgm: saved.bgm ?? true, refilled: saved.refilled ?? 0,
+      batchSize: saved.batchSize === 3 ? 3 : 1, feedQueue: saved.feedQueue ?? null, feedReadyAt: saved.feedReadyAt ?? 0 } : {
       wallet: 100, won: 0, paid: 0, direct: 0, gauge: 0, balls: 0,
       inputRemainder: 0, ballJobs: 0, towerJobs: 0, jackpots: 0,
       queue: [], active: null, payouts: [], nextId: 1,
       random: [seed >>> 0, (seed ^ 0x1825) >>> 0, (seed ^ 0x9e3779b9) >>> 0, (seed ^ 0xaf5c) >>> 0],
       muted: true, bgm: true, refilled: 0, vibration: true, quality: 'high',
+      batchSize: 1, feedQueue: null, feedReadyAt: 0,
     };
     this.random = this.state.random.map(n => new Random(n));
   }

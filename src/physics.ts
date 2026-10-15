@@ -1,5 +1,5 @@
 import RAPIER from '@dimforge/rapier3d-compat';
-import { CAPACITY, D, DT, INITIAL_COINS, LIMIT, METRES_PER_UNIT, THICKNESS, TOWER } from './config';
+import { CAPACITY, D, DT, INITIAL_COINS, LIMIT, METRES_PER_UNIT, PUSHER_PERIOD, THICKNESS, TOWER } from './config';
 import type { Game } from './game';
 
 export type V = { x: number; y: number; z: number };
@@ -289,7 +289,7 @@ export class Simulation {
     const diff=this.targetAngle-this.angle;
     this.angle+=Math.max(-DT*.8,Math.min(DT*.8,diff));
     this.rail.setNextKinematicRotation(yaw(this.angle));
-    const front=11.4+.6*Math.cos(this.time*Math.PI*2/3);
+    const front=11.4+.6*Math.cos(this.time*Math.PI*2/PUSHER_PERIOD);
     this.pusher.setNextKinematicTranslation(enginePoint(v(0,0,front)));
     this.tickRewards();
     for(const a of this.actors) {
