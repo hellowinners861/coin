@@ -112,8 +112,9 @@ test('rapid separate presses share the same safe rail spacing after saving',()=>
 
 
 test('arrival is centred on maximum forward extension rather than rear retraction',()=>{
-  // These expected phases come from the actual 3-second shelf motion: its
-  // front edge is nearest the player at 1.5s, not at 0s or 3s.
-  assert.ok(Math.abs(automaticLaunchPhase(1)-.55)<1e-8);
-  assert.ok(Math.abs(automaticLaunchPhase(3)-.31)<1e-8);
+  // At 1.5x speed the stroke is 2 seconds and the forward end is at 1s.
+  // Three-medal feed wraps into the previous cycle so its centre lands at 3s.
+  assert.equal(PUSHER_PERIOD,2);
+  assert.ok(Math.abs(automaticLaunchPhase(1)-.05)<1e-8);
+  assert.ok(Math.abs(automaticLaunchPhase(3)-1.81)<1e-8);
 });
