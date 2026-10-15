@@ -181,7 +181,7 @@ export class Simulation {
       for(let i=0;i<count;i++) {
         let p:V|undefined;
         for(let attempt=0;attempt<700;attempt++) {
-          const candidate=v((random()-.5)*12.7,0,rear?12.16+random()*4.8:.8+random()*10.3);
+          const candidate=v((random()-.5)*12.7,0,rear?12.16+random()*4.8:.55+random()*10.55);
           if(!rear && Math.abs(candidate.x-TOWER.x)<TOWER.half+.9 && Math.abs(candidate.z-TOWER.z)<TOWER.half+.9)continue;
           if(positions.every(q=>Math.hypot(q.x-candidate.x,q.z-candidate.z)>1.015)) {p=candidate;break;}
         }
@@ -193,7 +193,9 @@ export class Simulation {
         this.spawn('coin',p,'initial',rotation);
       }
     };
-    const lower=Math.round(INITIAL_COINS*.7);
+    // Most of the extra opening medals belong on the collection deck, rather
+    // than banking them behind the upper shelf's moving edge.
+    const lower=Math.round(INITIAL_COINS*.75);
     scatter(lower-lowerBase,false);scatter(INITIAL_COINS-lower,true);
     this.spawn('ball',v(-3.7,1.18,4.1),'initial');
     // Let the initial arrangement settle on the stationary machine.
