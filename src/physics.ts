@@ -16,7 +16,7 @@ export type PhysicsSave = {
   nextId: number; pusher: number; rail: number; lift: number; cage: number;
   towerPhase: TowerPhase; towerTime: number; towerId: number; towerBorn: number;
   payoutClock: number; ballClock: number; collisions: number;
-  pusherTime?: number; rewardHolding?: boolean; miniBallClock?: number; rewardWait?: number;
+  pusherTime?: number; pusherPeriod?: number; rewardHolding?: boolean; miniBallClock?: number; rewardWait?: number;
 };
 export const v = (x: number, y: number, z: number): V => ({ x, y, z });
 const enginePoint = (p: V) => v(p.x * D, p.y * D, p.z * D);
@@ -97,7 +97,10 @@ export class Simulation {
       this.world = RAPIER.World.restoreSnapshot(saved.world);
       this.actors = structuredClone(saved.actors);
       this.time = saved.time; this.angle = saved.angle; this.targetAngle = saved.targetAngle;
-      this.pusherTime=saved.pusherTime??saved.time;
+      // Older snapshots used a 3-second stroke. Preserve the physical phase
+      // when changing speed, including snapshots held at the forward end.
+      const oldPeriod=saved.pusherPeriod??3,oldTime=saved.pusherTime??saved.time;
+      this.pusherTime=oldTime*PUSHER_PERIOD/oldPeriod;
       this.rewardHolding=saved.rewardHolding??false;this.miniBallClock=saved.miniBallClock??0;
       this.rewardWait=saved.rewardWait??0;
       this.nextId = saved.nextId;
@@ -153,7 +156,7 @@ export class Simulation {
       towerPhase:this.towerPhase,towerTime:this.towerTime,towerId:this.towerId,towerBorn:this.towerBorn,
       payoutClock:this.payoutClock,ballClock:this.ballClock,collisions:this.collisions,
       pusherTime:this.pusherTime,rewardHolding:this.rewardHolding,miniBallClock:this.miniBallClock,
-      rewardWait:this.rewardWait,
+      rewardWait:this.rewardWait,pusherPeriod:PUSHER_PERIOD,
     };
   }
   spawn(kind: Actor['kind'], p: V, source: string, rotation=defaultRotation, velocity=v(0,0,0), tower?: number) {
@@ -234,8 +237,9 @@ export class Simulation {
   private clearArea(x: number,z: number,half: number,above=-1) {
     return !this.actors.some(a=>{const p=this.position(a);const r=a.kind==='ball'?1.1:a.kind==='miniBall'?MINI_BALL_RADIUS:.5;return p.y>above&&Math.abs(p.x-x)<half+r&&Math.abs(p.z-z)<half+r;});
   }
-  private clearSpawn(p: V, radius: number) {
+  private clearSpawn(p: V, radius: number, ignoreMiniBalls=false) {
     return !this.actors.some(a=>{
+      if(ignoreMiniBalls&&a.kind==='miniBall')return false;
       const q=this.position(a),r=a.kind==='ball'?1.1:a.kind==='miniBall'?MINI_BALL_RADIUS:.51;
       return Math.hypot(q.x-p.x,q.y-p.y,q.z-p.z)<radius+r+.02;
     });
@@ -287,9 +291,10 @@ export class Simulation {
     const s=this.game.state;
     const payout=s.payouts[0];
     if(payout && this.rewardHolding && this.payoutClock<=0 && this.hasCapacity()) {
-      // Do not spawn a reward inside another object.
+      // Mini balls never inhibit the feeder; the shot can physically hit them.
+      // Other medals and large balls still defer an obstructed shot.
       const p=v(REWARD_SHOOTER.x,REWARD_SHOOTER.y,REWARD_SHOOTER.z);
-      if(this.clearSpawn(p,.51)) {
+      if(this.clearSpawn(p,.51,true)) {
         const speed=12+this.game.random[3].next()*24;
         this.spawn('coin',p,payout.total===300?'jackpot':'fieldReward',yaw(this.game.random[3].next()*Math.PI*2),v(speed,1.2,.4));
         payout.remaining--;this.payoutClock=REWARD_SHOOTER.interval;

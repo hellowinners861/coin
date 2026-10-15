@@ -4,7 +4,7 @@ import RAPIER from '@dimforge/rapier3d-compat';
 import { Game } from '../src/game.ts';
 import { MedalFeed } from '../src/feed.ts';
 import { Simulation, v } from '../src/physics.ts';
-import { D, INITIAL_COINS, LIMIT, MINI_BALL_RADIUS, REWARD_SHOOTER, THICKNESS, TOWER } from '../src/config.ts';
+import { D, DT, INITIAL_COINS, LIMIT, MINI_BALL_RADIUS, PUSHER_PERIOD, REWARD_SHOOTER, THICKNESS, TOWER } from '../src/config.ts';
 
 await RAPIER.init();
 function empty(s:Simulation) {for(const a of s.actors)s.world.removeRigidBody(s.body(a));s.actors=[];}
@@ -49,7 +49,7 @@ test('side rewards wait for forward shelf, hold it, and preserve remaining shots
         assert.ok(s.position(a).x>REWARD_SHOOTER.x&&s.position(a).z>16);
         first=true;
       }
-      if(s.time<1.49)assert.equal(s.coins(),0);
+      if(s.time<PUSHER_PERIOD/2-DT)assert.equal(s.coins(),0);
     }
     assert.equal(first,true);assert.equal(s.rewardHolding,true);
     const copy=new Game(g.export()),resumed=new Simulation(copy,s.export());
@@ -76,6 +76,38 @@ test('a blocked side feeder releases the pusher and retains the full payout',()=
     for(let n=0;n<1100;n++){s.step();assert.equal(s.anomaly,'');}
     assert.equal(g.state.payouts.length,0);assert.equal(s.coins(),10);
   }finally{s.dispose();}
+});
+
+test('a mini ball at the reward muzzle does not inhibit a shot or disappear',()=>{
+  const g=new Game(undefined,123),s=new Simulation(g);empty(s);g.payout(10);
+  const mini=s.spawn('miniBall',v(REWARD_SHOOTER.x,REWARD_SHOOTER.y,REWARD_SHOOTER.z),'obstruction');
+  // Hold the obstruction in place so gravity cannot make the test pass by
+  // moving it out of the muzzle before the first forward stroke.
+  s.body(mini).setBodyType(RAPIER.RigidBodyType.Fixed,true);
+  try {
+    s.pusherTime=PUSHER_PERIOD/2-DT;
+    s.step();
+    assert.equal(s.coins(),1);assert.equal(g.state.payouts[0].remaining,9);
+    assert.ok(s.actors.includes(mini));assert.equal(s.miniBalls(),1);
+    assert.equal(g.state.miniBallsCollected,0);assert.equal(s.anomaly,'');
+  }finally{s.dispose();}
+});
+
+for(const holding of [false,true])test(`legacy 3-second save retains shelf position at 1.5x speed (holding=${holding})`,()=>{
+  const g=new Game(undefined,123),s=new Simulation(g);empty(s);
+  if(holding)g.payout(10);
+  const oldPhase=holding?1.5:.75,front=holding?10.8:11.4;
+  s.pusher.setTranslation(v(0,0,front),true);
+  const save=s.export();delete save.pusherPeriod;
+  save.pusherTime=oldPhase;save.rewardHolding=holding;
+  const resumed=new Simulation(new Game(g.export()),save);
+  try {
+    assert.equal(resumed.pusherTime,oldPhase*2/3);
+    assert.ok(Math.abs(resumed.pusher.translation().z-front)<1e-5);
+    resumed.step();assert.equal(resumed.anomaly,'');
+    assert.ok(Math.abs(resumed.pusher.translation().z-front)<.02,'restored shelf jumped to a different phase');
+    assert.equal(resumed.export().pusherPeriod,2);
+  }finally{s.dispose();resumed.dispose();}
 });
 
 test('opening piles vary with layout seed without consuming lottery randomness',()=>{
@@ -221,8 +253,11 @@ for(const count of [1,3] as const)for(const angle of [0,-LIMIT,LIMIT])test(`auto
   const g=new Game(undefined,123),s=new Simulation(g);empty(s);
   g.state.batchSize=count;const feed=new MedalFeed(g,s);feed.setAutomatic(true);s.setAngle(angle);
   const arrived=new Map<number,number>();
+  // At centre the single feed can use the first 1s forward stroke. Turning
+  // the rail misses that early launch window; triple feed targets 3s too.
+  const target=count===1&&angle===0?1:3;
   try {
-    for(let n=0;n<520;n++) {
+    for(let n=0;n<Math.ceil((target+.35)/DT);n++) {
       feed.tick();s.step();assert.equal(s.anomaly,'');
       for(const a of s.actors)if(a.source==='player') {
         const p=s.position(a);
@@ -230,10 +265,10 @@ for(const count of [1,3] as const)for(const angle of [0,-LIMIT,LIMIT])test(`auto
       }
     }
     assert.equal(g.state.paid,count);assert.equal(g.state.wallet,100-count);assert.equal(arrived.size,count);
-    for(const time of arrived.values())assert.ok(Math.abs(time-1.5)<.4,`arrival at ${time}`);
+    for(const time of arrived.values())assert.ok(Math.abs(time-target)<.4,`arrival at ${time}`);
     const centre=[...arrived.values()].reduce((sum,t)=>sum+t,0)/count;
-    assert.ok(Math.abs(centre-1.5)<.08,`batch centre at ${centre}`);
-    assert.ok([...arrived.values()].every(time=>11.4+.6*Math.cos(time*Math.PI*2/3)<11.0));
+    assert.ok(Math.abs(centre-target)<.08,`batch centre at ${centre}`);
+    assert.ok([...arrived.values()].every(time=>11.4+.6*Math.cos(time*Math.PI*2/PUSHER_PERIOD)<11.0));
     assert.ok(s.actors.filter(a=>a.source==='player').every(a=>s.body(a).isDynamic()));
   }finally{s.dispose();}
 });
