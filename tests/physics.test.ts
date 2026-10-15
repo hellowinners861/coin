@@ -4,7 +4,7 @@ import RAPIER from '@dimforge/rapier3d-compat';
 import { Game } from '../src/game.ts';
 import { MedalFeed } from '../src/feed.ts';
 import { Simulation, v } from '../src/physics.ts';
-import { D, DT, INITIAL_COINS, LIMIT, MINI_BALL_RADIUS, PUSHER_CENTER, PUSHER_HALF_STROKE, PUSHER_PERIOD, REWARD_SHOOTER, THICKNESS, TOWER } from '../src/config.ts';
+import { D, DT, INITIAL_COINS, LIMIT, MINI_BALL_RADIUS, MINI_BALL_SUPPLY, PUSHER_CENTER, PUSHER_HALF_STROKE, PUSHER_PERIOD, REWARD_SHOOTER, THICKNESS, TOWER } from '../src/config.ts';
 
 await RAPIER.init();
 function empty(s:Simulation) {for(const a of s.actors)s.world.removeRigidBody(s.body(a));s.actors=[];}
@@ -85,6 +85,19 @@ test('a small physical ball is collected once and queues ten medals after restor
   }finally{s.dispose();resumed.dispose();}
 });
 
+test('new mini balls enter one medal diameter higher and fall onto the upper shelf',()=>{
+  const g=new Game(undefined,123),s=new Simulation(g);empty(s);g.state.miniBallJobs=1;
+  try {
+    s.step();const mini=s.actors.find(a=>a.kind==='miniBall')!;
+    assert.ok(mini);assert.equal(g.state.miniBallJobs,0);
+    assert.ok(Math.abs(s.position(mini).y-3.6)<.02);
+    assert.equal(MINI_BALL_SUPPLY.y-2.6,1);
+    for(let n=0;n<160;n++){s.step();assert.equal(s.anomaly,'');}
+    assert.ok(s.actors.includes(mini));assert.ok(s.position(mini).y<2);
+    assert.ok(s.position(mini).z>12&&s.position(mini).z<18);
+  }finally{s.dispose();}
+});
+
 test('side rewards wait for forward shelf, hold it, and preserve remaining shots on restore',()=>{
   const g=new Game(undefined,123),s=new Simulation(g);empty(s);g.payout(10);
   let first=false;
@@ -113,17 +126,27 @@ test('side rewards wait for forward shelf, hold it, and preserve remaining shots
   }finally{s.dispose();}
 });
 
-test('a blocked side feeder releases the pusher and retains the full payout',()=>{
-  const g=new Game(undefined,123),s=new Simulation(g);empty(s);g.payout(10);
-  const blocker=s.spawn('ball',v(REWARD_SHOOTER.x,REWARD_SHOOTER.y,REWARD_SHOOTER.z),'obstruction');
-  s.body(blocker).setBodyType(RAPIER.RigidBodyType.Fixed,true);
+test('reward feeder completes a payout through a mini-ball and medal jam, including after restoring',()=>{
+  const g=new Game(undefined,123),s=new Simulation(g);empty(s);g.payout(30);
+  const {x,y,z}=REWARD_SHOOTER;
+  const mini=s.spawn('miniBall',v(x+.45,y-.2,z),'obstruction');
+  const coin=s.spawn('coin',v(x,y-.65,z),'obstruction');
+  // A persistent fixture reproduces the old indirect obstruction: the mini
+  // is ignored, but the nearby medal used to stop the entire payout.
+  for(const a of [mini,coin])s.body(a).setBodyType(RAPIER.RigidBodyType.Fixed,true);
   try {
-    for(let n=0;n<1000;n++){s.step();assert.equal(s.anomaly,'');}
-    assert.equal(g.state.payouts[0].remaining,10);assert.equal(s.coins(),0);
-    assert.equal(s.rewardHolding,false);assert.ok(s.pusherTime>1.6);
-    s.world.removeRigidBody(s.body(blocker));s.actors=[];
-    for(let n=0;n<1100;n++){s.step();assert.equal(s.anomaly,'');}
-    assert.equal(g.state.payouts.length,0);assert.equal(s.coins(),10);
+    s.pusherTime=PUSHER_PERIOD/2-DT;s.step();
+    assert.equal(g.state.payouts[0].remaining,29,'nearby medal stopped the first shot');
+    for(let n=0;n<150;n++){s.step();assert.equal(s.anomaly,'');}
+    assert.ok(g.state.payouts[0].remaining<29,'only the first shot escaped');
+    const copy=new Game(g.export()),resumed=new Simulation(copy,s.export());
+    try {
+      for(let n=0;n<1400;n++){resumed.step();assert.equal(resumed.anomaly,'');}
+      assert.equal(copy.state.payouts.length,0);
+      assert.equal(resumed.actors.filter(a=>a.source==='fieldReward').length+copy.state.won,30);
+      assert.equal(resumed.actors.filter(a=>a.source==='obstruction').length,2);
+      assert.equal(copy.state.miniBallsCollected,0);assert.equal(resumed.rewardHolding,false);
+    }finally{resumed.dispose();}
   }finally{s.dispose();}
 });
 

@@ -1,5 +1,5 @@
 import RAPIER from '@dimforge/rapier3d-compat';
-import { CAPACITY, D, DT, INITIAL_COINS, LIMIT, METRES_PER_UNIT, MINI_BALL_LIMIT, MINI_BALL_RADIUS, PUSHER_CENTER, PUSHER_HALF_STROKE, PUSHER_PERIOD, REWARD_SHOOTER, THICKNESS, TOWER } from './config';
+import { CAPACITY, D, DT, INITIAL_COINS, LIMIT, METRES_PER_UNIT, MINI_BALL_LIMIT, MINI_BALL_RADIUS, MINI_BALL_SUPPLY, PUSHER_CENTER, PUSHER_HALF_STROKE, PUSHER_PERIOD, REWARD_SHOOTER, THICKNESS, TOWER } from './config';
 import type { Game } from './game';
 
 export type V = { x: number; y: number; z: number };
@@ -241,9 +241,8 @@ export class Simulation {
   private clearArea(x: number,z: number,half: number,above=-1) {
     return !this.actors.some(a=>{const p=this.position(a);const r=a.kind==='ball'?1.1:a.kind==='miniBall'?MINI_BALL_RADIUS:.5;return p.y>above&&Math.abs(p.x-x)<half+r&&Math.abs(p.z-z)<half+r;});
   }
-  private clearSpawn(p: V, radius: number, ignoreMiniBalls=false) {
+  private clearSpawn(p: V, radius: number) {
     return !this.actors.some(a=>{
-      if(ignoreMiniBalls&&a.kind==='miniBall')return false;
       const q=this.position(a),r=a.kind==='ball'?1.1:a.kind==='miniBall'?MINI_BALL_RADIUS:.51;
       return Math.hypot(q.x-p.x,q.y-p.y,q.z-p.z)<radius+r+.02;
     });
@@ -295,17 +294,15 @@ export class Simulation {
     const s=this.game.state;
     const payout=s.payouts[0];
     if(payout && this.rewardHolding && this.payoutClock<=0 && this.hasCapacity()) {
-      // Mini balls never inhibit the feeder; the shot can physically hit them.
-      // Other medals and large balls still defer an obstructed shot.
+      // This powered feeder does not wait for board objects to move away.
+      // Every shot remains a real colliding medal, including through a jam.
       const p=v(REWARD_SHOOTER.x,REWARD_SHOOTER.y,REWARD_SHOOTER.z);
-      if(this.clearSpawn(p,.51,true)) {
-        const speed=12+this.game.random[3].next()*24;
-        this.spawn('coin',p,payout.total===300?'jackpot':'fieldReward',yaw(this.game.random[3].next()*Math.PI*2),v(speed,1.2,.4));
-        payout.remaining--;this.payoutClock=REWARD_SHOOTER.interval;
-        this.rewardWait=0;
-        if(payout.remaining===0) {s.payouts.shift();this.payoutClock=.35;}
-        this.game.onDurableChange();
-      }
+      const speed=12+this.game.random[3].next()*24;
+      this.spawn('coin',p,payout.total===300?'jackpot':'fieldReward',yaw(this.game.random[3].next()*Math.PI*2),v(speed,1.2,.4));
+      payout.remaining--;this.payoutClock=REWARD_SHOOTER.interval;
+      this.rewardWait=0;
+      if(payout.remaining===0) {s.payouts.shift();this.payoutClock=.35;}
+      this.game.onDurableChange();
     }
     if(s.ballJobs && this.balls()<3 && this.ballClock<=0) {
       const p=v(-5.5,3.7,16);
@@ -314,7 +311,7 @@ export class Simulation {
       }
     }
     if(s.miniBallJobs && this.miniBalls()<MINI_BALL_LIMIT && this.miniBallClock<=0) {
-      const p=v(5.8,2.6,15.2);
+      const p=v(MINI_BALL_SUPPLY.x,MINI_BALL_SUPPLY.y,MINI_BALL_SUPPLY.z);
       if(this.clearSpawn(p,MINI_BALL_RADIUS)) {
         this.spawn('miniBall',p,'reward');s.miniBallJobs--;this.miniBallClock=2;
         this.game.onDurableChange();

@@ -8,6 +8,7 @@ export const CAPACITY = 900;
 export const INITIAL_COINS = 460;
 export const MINI_BALL_RADIUS = .32;
 export const MINI_BALL_LIMIT = 6;
+export const MINI_BALL_SUPPLY = { x: 5.8, y: 3.6, z: 15.2 };
 export const REWARD_SHOOTER = { x: -6.35, y: 2.35, z: 16.65, interval: .18 };
 export const LIMIT = 17 * Math.PI / 180;
 export const PUSHER_PERIOD = 2;
