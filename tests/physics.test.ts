@@ -4,10 +4,59 @@ import RAPIER from '@dimforge/rapier3d-compat';
 import { Game } from '../src/game.ts';
 import { MedalFeed } from '../src/feed.ts';
 import { Simulation, v } from '../src/physics.ts';
-import { D, DT, INITIAL_COINS, LIMIT, MINI_BALL_RADIUS, PUSHER_PERIOD, REWARD_SHOOTER, THICKNESS, TOWER } from '../src/config.ts';
+import { D, DT, INITIAL_COINS, LIMIT, MINI_BALL_RADIUS, PUSHER_CENTER, PUSHER_HALF_STROKE, PUSHER_PERIOD, REWARD_SHOOTER, THICKNESS, TOWER } from '../src/config.ts';
 
 await RAPIER.init();
 function empty(s:Simulation) {for(const a of s.actors)s.world.removeRigidBody(s.body(a));s.actors=[];}
+
+test('the real pusher travels 1.8 medal diameters in a two-second round trip',()=>{
+  const s=new Simulation(new Game(undefined,123));empty(s);
+  try {
+    const start=s.pusher.translation().z;let min=start,max=start;
+    for(let n=0;n<Math.round(PUSHER_PERIOD/DT);n++) {
+      s.step();const z=s.pusher.translation().z;min=Math.min(min,z);max=Math.max(max,z);
+    }
+    assert.equal(PUSHER_PERIOD,2);
+    assert.ok(Math.abs(min-10.5)<1e-4);assert.ok(Math.abs(max-12.3)<1e-4);
+    assert.ok(Math.abs(max-min-1.8)<1e-4);
+    assert.ok(Math.abs(s.pusher.translation().z-start)<1e-4);assert.equal(s.anomaly,'');
+  }finally{s.dispose();}
+});
+
+test('the wider stroke pushes a lower medal forward without letting it under the shelf',()=>{
+  const s=new Simulation(new Game(undefined,123));empty(s);
+  const a=s.spawn('coin',v(0,THICKNESS/2+.004,11.2),'test');
+  try {
+    for(let n=0;n<960;n++) {
+      s.step();assert.equal(s.anomaly,'');
+      const p=s.position(a),front=s.pusher.translation().z;
+      assert.ok(!(p.z>front+.55&&p.y>-.1&&p.y<1.15),'medal went under the pusher');
+    }
+    assert.ok(s.position(a).z<10.5,'wider forward stroke did not displace medal');
+  }finally{s.dispose();}
+});
+
+for(const holding of [false,true])test(`old narrow-stroke save eases into 1.8D travel and preserves an in-progress migration (holding=${holding})`,()=>{
+  const g=new Game(undefined,123),s=new Simulation(g);empty(s);
+  if(holding)g.payout(10);
+  s.pusherTime=holding?1:.4;
+  const front=PUSHER_CENTER+.6*Math.cos(s.pusherTime*Math.PI*2/PUSHER_PERIOD);
+  s.pusher.setTranslation(v(0,0,front),true);
+  const save=s.export();delete save.pusherHalfStroke;save.rewardHolding=holding;
+  const resumed=new Simulation(new Game(g.export()),save);
+  try {
+    assert.equal(resumed.pusherHalfStroke,.6);
+    assert.ok(Math.abs(resumed.pusher.translation().z-front)<1e-5);
+    resumed.step();assert.ok(Math.abs(resumed.pusher.translation().z-front)<.02);
+    for(let n=0;n<59;n++)resumed.step();
+    const copy=new Simulation(new Game(resumed.game.export()),resumed.export());
+    try {
+      assert.equal(copy.pusherHalfStroke,resumed.pusherHalfStroke);
+      for(let n=0;n<181;n++){copy.step();assert.equal(copy.anomaly,'');}
+      assert.ok(Math.abs(copy.pusherHalfStroke-.9)<1e-6);
+    }finally{copy.dispose();}
+  }finally{s.dispose();resumed.dispose();}
+});
 
 test('initial board has the tuned medal population and one ball',()=>{
   const s=new Simulation(new Game(undefined,123));
@@ -45,7 +94,7 @@ test('side rewards wait for forward shelf, hold it, and preserve remaining shots
       if(s.coins()>before) {
         const a=s.actors.at(-1)!;
         assert.equal(a.source,'fieldReward');
-        assert.ok(Math.abs(s.pusher.translation().z-10.8)<.001);
+        assert.ok(Math.abs(s.pusher.translation().z-(PUSHER_CENTER-PUSHER_HALF_STROKE))<.001);
         assert.ok(s.position(a).x>REWARD_SHOOTER.x&&s.position(a).z>16);
         first=true;
       }
@@ -98,7 +147,7 @@ for(const holding of [false,true])test(`legacy 3-second save retains shelf posit
   if(holding)g.payout(10);
   const oldPhase=holding?1.5:.75,front=holding?10.8:11.4;
   s.pusher.setTranslation(v(0,0,front),true);
-  const save=s.export();delete save.pusherPeriod;
+  const save=s.export();delete save.pusherPeriod;delete save.pusherHalfStroke;
   save.pusherTime=oldPhase;save.rewardHolding=holding;
   const resumed=new Simulation(new Game(g.export()),save);
   try {
@@ -268,7 +317,7 @@ for(const count of [1,3] as const)for(const angle of [0,-LIMIT,LIMIT])test(`auto
     for(const time of arrived.values())assert.ok(Math.abs(time-target)<.4,`arrival at ${time}`);
     const centre=[...arrived.values()].reduce((sum,t)=>sum+t,0)/count;
     assert.ok(Math.abs(centre-target)<.08,`batch centre at ${centre}`);
-    assert.ok([...arrived.values()].every(time=>11.4+.6*Math.cos(time*Math.PI*2/PUSHER_PERIOD)<11.0));
+    assert.ok([...arrived.values()].every(time=>PUSHER_CENTER+PUSHER_HALF_STROKE*Math.cos(time*Math.PI*2/PUSHER_PERIOD)<11.0));
     assert.ok(s.actors.filter(a=>a.source==='player').every(a=>s.body(a).isDynamic()));
   }finally{s.dispose();}
 });
