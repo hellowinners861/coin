@@ -5,7 +5,10 @@ export const D = 1;
 export const THICKNESS = 0.072;
 export const DT = 1 / 240;
 export const CAPACITY = 900;
-export const INITIAL_COINS = 360;
+export const INITIAL_COINS = 460;
+export const MINI_BALL_RADIUS = .32;
+export const MINI_BALL_LIMIT = 6;
+export const REWARD_SHOOTER = { x: -6.35, y: 2.35, z: 16.65, interval: .18 };
 export const LIMIT = 17 * Math.PI / 180;
 export const PUSHER_PERIOD = 3;
 export const FEED_INTERVAL = .24;
@@ -22,11 +25,11 @@ export const NORMAL: readonly [Result, number][] = [
 export const JPC: readonly [Result, number][] = [['CREDIT_10', 70], ['FIELD_30', 20], ['JACKPOT', 10]];
 export const RESULT_LABELS: Record<Result, { title: string; detail: string }> = {
   NONE: { title: '次のチャンスへ', detail: 'メダルを落として、もう一度。' },
-  CREDIT_10: { title: '10枚を獲得', detail: '手持ちのメダルに加わりました。' },
+  CREDIT_10: { title: '10枚を払い出し', detail: '上段左横から盤面へ。手前へ落として獲得。' },
   BALL_1: { title: 'ボール追加', detail: '奥の供給口から、盤面へ。' },
   TOWER_STANDARD: { title: 'コインタワー', detail: '120枚のタワーを準備しています。' },
   JPC_ENTRY: { title: 'ジャックポットチャンス', detail: '大量のメダルを狙う抽選へ。' },
   JACKPOT_DIRECT: { title: 'JACKPOT', detail: '300枚のメダルを盤面へ払い出します。' },
-  FIELD_30: { title: '30枚を払い出し', detail: '盤面に落ちるメダルを狙おう。' },
+  FIELD_30: { title: '30枚を払い出し', detail: '上段左横から奥側へ順番に射出します。' },
   JACKPOT: { title: 'JACKPOT', detail: '300枚のメダルを盤面へ払い出します。' },
 };

@@ -1,4 +1,4 @@
-import { JPC, NORMAL, RESULT_LABELS, type Result } from './config';
+import { JPC, MINI_BALL_LIMIT, NORMAL, RESULT_LABELS, type Result } from './config';
 
 export class Random {
   constructor(public value: number) { this.value >>>= 0; }
@@ -21,6 +21,7 @@ export type FeedQueue = { remaining: number; nextAt: number; automatic: boolean;
 export type GameState = {
   wallet: number; won: number; paid: number; direct: number; gauge: number; balls: number;
   inputRemainder: number; ballJobs: number; towerJobs: number; jackpots: number;
+  miniBallJobs: number; miniBallsCollected: number;
   queue: Ticket[]; active: Ticket | null; payouts: Payout[]; nextId: number;
   random: number[]; muted: boolean; bgm: boolean; refilled: number; vibration: boolean; quality: 'high' | 'low';
   batchSize: 1 | 3; feedQueue: FeedQueue | null; feedReadyAt: number;
@@ -33,9 +34,11 @@ export class Game {
   onDurableChange: () => void = () => {};
   constructor(saved?: GameState, seed = Date.now()) {
     this.state = saved ? { ...saved, bgm: saved.bgm ?? true, refilled: saved.refilled ?? 0,
+      miniBallJobs: saved.miniBallJobs ?? 0, miniBallsCollected: saved.miniBallsCollected ?? 0,
       batchSize: saved.batchSize === 3 ? 3 : 1, feedQueue: saved.feedQueue ?? null, feedReadyAt: saved.feedReadyAt ?? 0 } : {
       wallet: 100, won: 0, paid: 0, direct: 0, gauge: 0, balls: 0,
       inputRemainder: 0, ballJobs: 0, towerJobs: 0, jackpots: 0,
+      miniBallJobs: 0, miniBallsCollected: 0,
       queue: [], active: null, payouts: [], nextId: 1,
       random: [seed >>> 0, (seed ^ 0x1825) >>> 0, (seed ^ 0x9e3779b9) >>> 0, (seed ^ 0xaf5c) >>> 0],
       muted: true, bgm: true, refilled: 0, vibration: true, quality: 'high',
@@ -50,10 +53,11 @@ export class Game {
   enqueue(kind: Ticket['kind']) {
     this.state.queue.push({ id: this.state.nextId++, kind, elapsed: 0, applied: false });
   }
-  spend(liveBalls: number): boolean {
+  spend(liveBalls: number, liveMiniBalls = 0): boolean {
     const s = this.state;
     if (s.wallet < 1) return false;
     s.wallet--; s.paid++; s.inputRemainder++;
+    if (s.paid % 10 === 0 && liveMiniBalls + s.miniBallJobs < MINI_BALL_LIMIT) s.miniBallJobs++;
     if (s.inputRemainder === 5) {
       s.inputRemainder = 0;
       if (liveBalls + s.ballJobs < 3 && this.random[1].next() < 0.2) s.ballJobs++;
@@ -80,12 +84,17 @@ export class Game {
     if (s.balls >= 3) { s.balls -= 3; this.enqueue('jpc'); }
     this.onSound('ball'); this.onChange(); this.onDurableChange();
   }
+  collectMiniBall() {
+    this.state.miniBallsCollected++;
+    this.payout(10);
+    this.onSound('ball'); this.onChange(); this.onDurableChange();
+  }
   apply(ticket: Ticket) {
     if (ticket.applied || !ticket.result) return;
     const s = this.state;
     ticket.applied = true;
     switch (ticket.result) {
-      case 'CREDIT_10': s.wallet += 10; s.direct += 10; break;
+      case 'CREDIT_10': this.payout(10); break;
       case 'BALL_1': s.ballJobs++; break;
       case 'TOWER_STANDARD': s.towerJobs++; break;
       case 'JPC_ENTRY': this.enqueue('jpc'); break;

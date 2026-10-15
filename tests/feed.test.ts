@@ -26,6 +26,16 @@ test('one accepted press launches exactly three individually charged medals',()=
   assert.equal(h.game.state.paid,3);assert.equal(h.game.state.feedQueue,null);
 });
 
+test('automatic phase uses the shelf clock after a reward hold, not elapsed wall time',()=>{
+  const g=new Game(undefined,123);let launched=0;
+  const sim={time:20,pusherTime:automaticLaunchPhase(1),angle:0,targetAngle:0,
+    insert(){launched++;return g.spend(0);}};
+  const feed=new MedalFeed(g,sim);feed.setAutomatic(true);feed.tick();
+  assert.equal(launched,1);
+  sim.time+=10;feed.tick();assert.equal(launched,1);
+  sim.pusherTime+=PUSHER_PERIOD;feed.tick();assert.equal(launched,2);
+});
+
 test('a three-medal burst uses only remaining credit, and blocked launches are not charged',()=>{
   const h=harness();h.game.state.wallet=2;h.game.state.batchSize=3;
   h.block(true);h.feed.requestManual();h.feed.tick();assert.equal(h.game.state.wallet,2);

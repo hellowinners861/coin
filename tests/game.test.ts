@@ -12,12 +12,30 @@ test('large simultaneous collections issue every ticket and preserve remainder',
   assert.equal(g.state.queue.length,3);assert.equal(g.state.gauge,5);
   assert.equal(g.state.wallet,171);assert.equal(g.state.won,71);
 });
-test('direct credit is idempotent and never advances collection progress',()=>{
+test('10-medal prizes create one physical entitlement without direct credit',()=>{
   const g=new Game(undefined,12);
   const ticket:Ticket={id:1,kind:'normal',result:'CREDIT_10',elapsed:1,applied:false};
   g.apply(ticket);g.apply(ticket);
-  assert.equal(g.state.wallet,110);assert.equal(g.state.direct,10);
+  assert.equal(g.state.wallet,100);assert.equal(g.state.direct,0);
+  assert.equal(g.state.payouts.length,1);assert.equal(g.state.payouts[0].remaining,10);
   assert.equal(g.state.gauge,0);assert.equal(g.state.won,0);
+});
+test('mini balls pay ten onto the board without advancing normal balls or wins',()=>{
+  const g=new Game(undefined,12);g.state.balls=2;
+  g.collectMiniBall();
+  assert.equal(g.state.wallet,100);assert.equal(g.state.won,0);assert.equal(g.state.gauge,0);
+  assert.equal(g.state.balls,2);assert.equal(g.state.queue.length,0);
+  assert.equal(g.state.payouts[0].remaining,10);assert.equal(g.state.miniBallsCollected,1);
+  const copy=new Game(g.export());assert.equal(copy.state.payouts[0].remaining,10);
+  assert.equal(copy.state.miniBallsCollected,1);
+});
+test('paid input replenishes mini balls independently and respects their cap',()=>{
+  const g=new Game(undefined,12);
+  for(let i=0;i<10;i++)g.spend(3,3);
+  assert.equal(g.state.miniBallJobs,1);
+  for(let i=0;i<10;i++)g.spend(3,6);
+  assert.equal(g.state.miniBallJobs,1);
+  g.collectCoins(30);g.refillWallet();assert.equal(g.state.miniBallJobs,1);
 });
 test('JP creates a physical payout entitlement, not wallet credit',()=>{
   const g=new Game(undefined,12);
@@ -73,8 +91,10 @@ test('refill at zero is repeat-safe and does not count as a win or event',()=>{
 test('older saves keep their wallet and mute preference when adding music and refill state',()=>{
   const g=new Game(undefined,12), saved=g.export();saved.wallet=0;saved.muted=true;
   Reflect.deleteProperty(saved,'bgm');Reflect.deleteProperty(saved,'refilled');Reflect.deleteProperty(saved,'batchSize');Reflect.deleteProperty(saved,'feedQueue');Reflect.deleteProperty(saved,'feedReadyAt');
+  Reflect.deleteProperty(saved,'miniBallJobs');Reflect.deleteProperty(saved,'miniBallsCollected');
   const restored=new Game(saved);
   assert.equal(restored.state.wallet,0);assert.equal(restored.state.muted,true);
   assert.equal(restored.state.bgm,true);assert.equal(restored.state.refilled,0);assert.equal(restored.state.batchSize,1);assert.equal(restored.state.feedQueue,null);assert.equal(restored.state.feedReadyAt,0);
   assert.equal(restored.refillWallet(),true);
+  assert.equal(restored.state.miniBallJobs,0);assert.equal(restored.state.miniBallsCollected,0);
 });

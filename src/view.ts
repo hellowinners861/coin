@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
-import { CAPACITY, D, THICKNESS, TOWER } from './config';
+import { CAPACITY, D, MINI_BALL_LIMIT, MINI_BALL_RADIUS, REWARD_SHOOTER, THICKNESS, TOWER } from './config';
 import { Random } from './game';
 import type { Actor, Part, Simulation, V } from './physics';
 
@@ -20,12 +20,12 @@ function brushedTexture() {
 }
 function coinMap() {
   const canvas=document.createElement('canvas');canvas.width=256;canvas.height=256;
-  const ctx=canvas.getContext('2d')!;ctx.fillStyle='#c1b58f';ctx.fillRect(0,0,256,256);
+  const ctx=canvas.getContext('2d')!;ctx.fillStyle='#e7b83e';ctx.fillRect(0,0,256,256);
   for(const [r,width] of [[114,3],[106,1.5],[77,1]] ) {
-    ctx.beginPath();ctx.arc(128,128,r,0,Math.PI*2);ctx.lineWidth=width;ctx.strokeStyle='#9b8f6c';ctx.stroke();
-    ctx.beginPath();ctx.arc(128,126,r-1,0,Math.PI*2);ctx.lineWidth=1;ctx.strokeStyle='#e7dcc0';ctx.stroke();
+    ctx.beginPath();ctx.arc(128,128,r,0,Math.PI*2);ctx.lineWidth=width;ctx.strokeStyle='#a87216';ctx.stroke();
+    ctx.beginPath();ctx.arc(128,126,r-1,0,Math.PI*2);ctx.lineWidth=1;ctx.strokeStyle='#ffe6a0';ctx.stroke();
   }
-  ctx.strokeStyle='#9c906e';ctx.lineWidth=2;
+  ctx.strokeStyle='#ae7c1d';ctx.lineWidth=2;
   for(let i=0;i<40;i++) {
     const a=i*Math.PI/20;
     ctx.beginPath();ctx.moveTo(128+85*Math.cos(a),128+85*Math.sin(a));
@@ -43,6 +43,7 @@ export class BoardView {
   coins: THREE.InstancedMesh;
   balls: THREE.InstancedMesh;
   cores: THREE.InstancedMesh;
+  miniBalls: THREE.InstancedMesh;
   dummy=new THREE.Object3D();
   private q=new THREE.Quaternion();
   private resizeObserver: ResizeObserver;
@@ -106,6 +107,10 @@ export class BoardView {
       box({size:{x:1.4,y:.48,z:.13},at:{x,y:3.6,z:17.62},material:'steel'},true);
       box({size:{x:1.08,y:.24,z:.17},at:{x,y:3.61,z:17.52},material:'dark'},true);
     }
+    // Side feeder faces across the upper shelf, separate from the player rail.
+    box({size:{x:.8,y:.48,z:.9},at:{x:-6.9,y:REWARD_SHOOTER.y,z:REWARD_SHOOTER.z},material:'green'},true);
+    box({size:{x:.08,y:.22,z:.62},at:{x:-6.47,y:REWARD_SHOOTER.y,z:REWARD_SHOOTER.z},material:'brass'},true);
+    box({size:{x:.09,y:.1,z:.45},at:{x:-6.42,y:REWARD_SHOOTER.y,z:REWARD_SHOOTER.z},material:'dark'},true);
     const pivot=new THREE.Mesh(new THREE.CylinderGeometry(.57,.66,.38,40),materials.brass);
     pivot.position.set(0,6.65,-1);pivot.castShadow=true;this.scene.add(pivot);
     const stem=new THREE.Mesh(new THREE.CylinderGeometry(.2,.30,8.2,24),materials.green);
@@ -127,8 +132,10 @@ export class BoardView {
     key.target.position.set(0,0,8);this.scene.add(key,key.target);
     const fill=new THREE.DirectionalLight('#e6efee',1.1);fill.position.set(12,13,14);this.scene.add(fill);
     const medallionMap=coinMap();
-    const edge=new THREE.MeshStandardMaterial({color:'#b5a77e',metalness:.87,roughness:.30});
-    const face=new THREE.MeshStandardMaterial({map:medallionMap,metalness:.83,roughness:.31});
+    // A richer gold base and tighter reflected highlights, without emission:
+    // shaded medals still read as metal under the existing neutral room map.
+    const edge=new THREE.MeshStandardMaterial({color:'#d9a62e',metalness:.94,roughness:.23});
+    const face=new THREE.MeshStandardMaterial({map:medallionMap,metalness:.94,roughness:.26});
     const coinGeometry=new THREE.CylinderGeometry(.5,.5,THICKNESS,32,1);
     this.coins=new THREE.InstancedMesh(coinGeometry,[edge,face,face],CAPACITY);
     this.coins.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
@@ -138,6 +145,10 @@ export class BoardView {
     this.balls.castShadow=true;this.balls.receiveShadow=true;this.balls.frustumCulled=false;this.scene.add(this.balls);
     this.cores=new THREE.InstancedMesh(new THREE.SphereGeometry(.42,16,12),new THREE.MeshStandardMaterial({color:'#74521e',metalness:.6,roughness:.32}),3);
     this.cores.frustumCulled=false;this.scene.add(this.cores);
+    this.miniBalls=new THREE.InstancedMesh(new THREE.SphereGeometry(MINI_BALL_RADIUS,20,14),
+      new THREE.MeshPhysicalMaterial({color:'#28c6dc',metalness:.15,roughness:.17,clearcoat:1}),MINI_BALL_LIMIT);
+    this.miniBalls.castShadow=true;this.miniBalls.receiveShadow=true;
+    this.miniBalls.frustumCulled=false;this.scene.add(this.miniBalls);
     this.camera.position.set(0,32,-15);this.camera.lookAt(0,1.7,8);
     this.resizeObserver=new ResizeObserver(()=>this.resize());this.resizeObserver.observe(host);this.resize();
   }
@@ -169,16 +180,18 @@ export class BoardView {
       const body=this.simulation[name],p=body.translation(),q=body.rotation();
       this.groups[name].position.set(p.x/D,p.y/D,p.z/D);this.groups[name].quaternion.set(q.x,q.y,q.z,q.w);
     }
-    let coins=0,balls=0;
+    let coins=0,balls=0,minis=0;
     for(const a of this.simulation.actors) {
       this.actorMatrix(a,alpha);
       if(a.kind==='coin')this.coins.setMatrixAt(coins++,this.dummy.matrix);
+      else if(a.kind==='miniBall')this.miniBalls.setMatrixAt(minis++,this.dummy.matrix);
       else {
         this.balls.setMatrixAt(balls,this.dummy.matrix);
         this.dummy.translateX(.24);this.dummy.updateMatrix();this.cores.setMatrixAt(balls++,this.dummy.matrix);
       }
     }
     this.coins.count=coins;this.balls.count=this.cores.count=balls;
+    this.miniBalls.count=minis;this.miniBalls.instanceMatrix.needsUpdate=true;
     this.coins.instanceMatrix.needsUpdate=true;this.balls.instanceMatrix.needsUpdate=true;this.cores.instanceMatrix.needsUpdate=true;
     this.renderer.render(this.scene,this.camera);
   }
