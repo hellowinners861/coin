@@ -1,5 +1,5 @@
 import RAPIER from '@dimforge/rapier3d-compat';
-import { CAPACITY, D, DT, INITIAL_COINS, LIMIT, METRES_PER_UNIT, MINI_BALL_LIMIT, MINI_BALL_RADIUS, PUSHER_PERIOD, REWARD_SHOOTER, THICKNESS, TOWER } from './config';
+import { CAPACITY, D, DT, INITIAL_COINS, LIMIT, METRES_PER_UNIT, MINI_BALL_LIMIT, MINI_BALL_RADIUS, PUSHER_CENTER, PUSHER_HALF_STROKE, PUSHER_PERIOD, REWARD_SHOOTER, THICKNESS, TOWER } from './config';
 import type { Game } from './game';
 
 export type V = { x: number; y: number; z: number };
@@ -16,7 +16,7 @@ export type PhysicsSave = {
   nextId: number; pusher: number; rail: number; lift: number; cage: number;
   towerPhase: TowerPhase; towerTime: number; towerId: number; towerBorn: number;
   payoutClock: number; ballClock: number; collisions: number;
-  pusherTime?: number; pusherPeriod?: number; rewardHolding?: boolean; miniBallClock?: number; rewardWait?: number;
+  pusherTime?: number; pusherPeriod?: number; pusherHalfStroke?: number; rewardHolding?: boolean; miniBallClock?: number; rewardWait?: number;
 };
 export const v = (x: number, y: number, z: number): V => ({ x, y, z });
 const enginePoint = (p: V) => v(p.x * D, p.y * D, p.z * D);
@@ -86,6 +86,7 @@ export class Simulation {
   parts = machineParts();
   time = 0; angle = 0; targetAngle = 0; nextId = 1;
   pusherTime = 0; rewardHolding = false; miniBallClock = 0; rewardWait = 0;
+  pusherHalfStroke = PUSHER_HALF_STROKE;
   pusher: RAPIER.RigidBody; rail: RAPIER.RigidBody; lift: RAPIER.RigidBody; cage: RAPIER.RigidBody;
   towerPhase: TowerPhase = 'idle'; towerTime = 0; towerId = 0; towerBorn = 0;
   payoutClock = 0; ballClock = 0; collisions = 0; anomaly = '';
@@ -101,6 +102,9 @@ export class Simulation {
       // when changing speed, including snapshots held at the forward end.
       const oldPeriod=saved.pusherPeriod??3,oldTime=saved.pusherTime??saved.time;
       this.pusherTime=oldTime*PUSHER_PERIOD/oldPeriod;
+      // Ease old 0.6D half-stroke snapshots into the wider range instead of
+      // teleporting a loaded shelf and the medals on it on the first step.
+      this.pusherHalfStroke=saved.pusherHalfStroke??.6;
       this.rewardHolding=saved.rewardHolding??false;this.miniBallClock=saved.miniBallClock??0;
       this.rewardWait=saved.rewardWait??0;
       this.nextId = saved.nextId;
@@ -128,7 +132,7 @@ export class Simulation {
     this.world.integrationParameters.normalizedAllowedLinearError = .00002 / METRES_PER_UNIT;
     this.world.integrationParameters.normalizedPredictionDistance = .0007 / METRES_PER_UNIT;
     const kinematic = (p: V) => this.world.createRigidBody(RAPIER.RigidBodyDesc.kinematicPositionBased().setTranslation(...Object.values(enginePoint(p)) as [number,number,number]));
-    this.pusher = kinematic(v(0,0,12));
+    this.pusher = kinematic(v(0,0,PUSHER_CENTER+PUSHER_HALF_STROKE));
     this.rail = kinematic(v(0,0,-1));
     this.lift = kinematic(v(TOWER.x,-.12,TOWER.z));
     this.cage = kinematic(v(TOWER.x,-4.7,TOWER.z));
@@ -156,7 +160,7 @@ export class Simulation {
       towerPhase:this.towerPhase,towerTime:this.towerTime,towerId:this.towerId,towerBorn:this.towerBorn,
       payoutClock:this.payoutClock,ballClock:this.ballClock,collisions:this.collisions,
       pusherTime:this.pusherTime,rewardHolding:this.rewardHolding,miniBallClock:this.miniBallClock,
-      rewardWait:this.rewardWait,pusherPeriod:PUSHER_PERIOD,
+      rewardWait:this.rewardWait,pusherPeriod:PUSHER_PERIOD,pusherHalfStroke:this.pusherHalfStroke,
     };
   }
   spawn(kind: Actor['kind'], p: V, source: string, rotation=defaultRotation, velocity=v(0,0,0), tower?: number) {
@@ -334,7 +338,9 @@ export class Simulation {
         this.pusherTime=nextForward;this.rewardHolding=true;this.rewardWait=0;
       } else this.pusherTime+=DT;
     }
-    const front=11.4+.6*Math.cos(this.pusherTime*Math.PI*2/PUSHER_PERIOD);
+    const strokeDelta=PUSHER_HALF_STROKE-this.pusherHalfStroke;
+    this.pusherHalfStroke+=Math.max(-DT*.3,Math.min(DT*.3,strokeDelta));
+    const front=PUSHER_CENTER+this.pusherHalfStroke*Math.cos(this.pusherTime*Math.PI*2/PUSHER_PERIOD);
     this.pusher.setNextKinematicTranslation(enginePoint(v(0,0,front)));
     this.tickRewards();
     for(const a of this.actors) {
