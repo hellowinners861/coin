@@ -99,3 +99,11 @@ test('rapid separate presses share the same safe rail spacing after saving',()=>
   restored.sim.time=FEED_INTERVAL;restored.feed.tick();
   assert.equal(restored.launches.length,1);assert.equal(restored.game.state.wallet,98);
 });
+
+
+test('arrival is centred on maximum forward extension rather than rear retraction',()=>{
+  // These expected phases come from the actual 3-second shelf motion: its
+  // front edge is nearest the player at 1.5s, not at 0s or 3s.
+  assert.ok(Math.abs(automaticLaunchPhase(1)-.55)<1e-8);
+  assert.ok(Math.abs(automaticLaunchPhase(3)-.31)<1e-8);
+});

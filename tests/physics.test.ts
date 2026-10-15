@@ -154,21 +154,23 @@ test('ordinary play moves the opening bank into the real collection tray',()=>{
 });
 
 
-for(const angle of [0,-LIMIT,LIMIT])test(`auto triple uses three real medals and lands near rear retraction at angle ${angle.toFixed(3)}`,()=>{
+for(const count of [1,3] as const)for(const angle of [0,-LIMIT,LIMIT])test(`auto ${count} lands when the shelf is forward at angle ${angle.toFixed(3)}`,()=>{
   const g=new Game(undefined,123),s=new Simulation(g);empty(s);
-  g.state.batchSize=3;const feed=new MedalFeed(g,s);feed.setAutomatic(true);s.setAngle(angle);
+  g.state.batchSize=count;const feed=new MedalFeed(g,s);feed.setAutomatic(true);s.setAngle(angle);
   const arrived=new Map<number,number>();
   try {
-    for(let n=0;n<880;n++) {
+    for(let n=0;n<520;n++) {
       feed.tick();s.step();assert.equal(s.anomaly,'');
       for(const a of s.actors)if(a.source==='player') {
         const p=s.position(a);
         if(p.z>14&&p.y<2&&!arrived.has(a.id))arrived.set(a.id,s.time);
       }
     }
-    assert.equal(g.state.paid,3);assert.equal(g.state.wallet,97);assert.equal(arrived.size,3);
-    for(const time of arrived.values())assert.ok(Math.abs(time-3)<.4,`arrival at ${time}`);
-    assert.ok([...arrived.values()].every(time=>11.4+.6*Math.cos(time*Math.PI*2/3)>11.8));
+    assert.equal(g.state.paid,count);assert.equal(g.state.wallet,100-count);assert.equal(arrived.size,count);
+    for(const time of arrived.values())assert.ok(Math.abs(time-1.5)<.4,`arrival at ${time}`);
+    const centre=[...arrived.values()].reduce((sum,t)=>sum+t,0)/count;
+    assert.ok(Math.abs(centre-1.5)<.08,`batch centre at ${centre}`);
+    assert.ok([...arrived.values()].every(time=>11.4+.6*Math.cos(time*Math.PI*2/3)<11.0));
     assert.ok(s.actors.filter(a=>a.source==='player').every(a=>s.body(a).isDynamic()));
   }finally{s.dispose();}
 });
