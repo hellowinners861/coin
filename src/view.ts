@@ -20,12 +20,12 @@ function brushedTexture() {
 }
 function coinMap() {
   const canvas=document.createElement('canvas');canvas.width=256;canvas.height=256;
-  const ctx=canvas.getContext('2d')!;ctx.fillStyle='#c1b58f';ctx.fillRect(0,0,256,256);
+  const ctx=canvas.getContext('2d')!;ctx.fillStyle='#e7b83e';ctx.fillRect(0,0,256,256);
   for(const [r,width] of [[114,3],[106,1.5],[77,1]] ) {
-    ctx.beginPath();ctx.arc(128,128,r,0,Math.PI*2);ctx.lineWidth=width;ctx.strokeStyle='#9b8f6c';ctx.stroke();
-    ctx.beginPath();ctx.arc(128,126,r-1,0,Math.PI*2);ctx.lineWidth=1;ctx.strokeStyle='#e7dcc0';ctx.stroke();
+    ctx.beginPath();ctx.arc(128,128,r,0,Math.PI*2);ctx.lineWidth=width;ctx.strokeStyle='#a87216';ctx.stroke();
+    ctx.beginPath();ctx.arc(128,126,r-1,0,Math.PI*2);ctx.lineWidth=1;ctx.strokeStyle='#ffe6a0';ctx.stroke();
   }
-  ctx.strokeStyle='#9c906e';ctx.lineWidth=2;
+  ctx.strokeStyle='#ae7c1d';ctx.lineWidth=2;
   for(let i=0;i<40;i++) {
     const a=i*Math.PI/20;
     ctx.beginPath();ctx.moveTo(128+85*Math.cos(a),128+85*Math.sin(a));
@@ -127,8 +127,10 @@ export class BoardView {
     key.target.position.set(0,0,8);this.scene.add(key,key.target);
     const fill=new THREE.DirectionalLight('#e6efee',1.1);fill.position.set(12,13,14);this.scene.add(fill);
     const medallionMap=coinMap();
-    const edge=new THREE.MeshStandardMaterial({color:'#b5a77e',metalness:.87,roughness:.30});
-    const face=new THREE.MeshStandardMaterial({map:medallionMap,metalness:.83,roughness:.31});
+    // A richer gold base and tighter reflected highlights, without emission:
+    // shaded medals still read as metal under the existing neutral room map.
+    const edge=new THREE.MeshStandardMaterial({color:'#d9a62e',metalness:.94,roughness:.23});
+    const face=new THREE.MeshStandardMaterial({map:medallionMap,metalness:.94,roughness:.26});
     const coinGeometry=new THREE.CylinderGeometry(.5,.5,THICKNESS,32,1);
     this.coins=new THREE.InstancedMesh(coinGeometry,[edge,face,face],CAPACITY);
     this.coins.instanceMatrix.setUsage(THREE.DynamicDrawUsage);

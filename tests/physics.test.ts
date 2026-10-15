@@ -20,7 +20,7 @@ test('opening piles vary with layout seed without consuming lottery randomness',
   const before=a.random.slice(0,3).map(r=>r.value);
   const sa=new Simulation(a),sb=new Simulation(b);
   try {
-    assert.equal(sa.coins(),360);assert.equal(sb.coins(),360);
+    assert.equal(sa.coins(),INITIAL_COINS);assert.equal(sb.coins(),INITIAL_COINS);
     assert.deepEqual(a.random.slice(0,3).map(r=>r.value),before);
     const pa=sa.actors.filter(c=>c.kind==='coin').map(c=>sa.position(c));
     const pb=sb.actors.filter(c=>c.kind==='coin').map(c=>sb.position(c));
