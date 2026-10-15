@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import RAPIER from '@dimforge/rapier3d-compat';
 import { Game } from '../src/game.ts';
+import { MedalFeed } from '../src/feed.ts';
 import { Simulation, v } from '../src/physics.ts';
 import { D, INITIAL_COINS, LIMIT, THICKNESS, TOWER } from '../src/config.ts';
 
@@ -149,5 +150,25 @@ test('ordinary play moves the opening bank into the real collection tray',()=>{
     }
     assert.ok(g.state.paid>20);assert.ok(g.state.won>=5,`opening bank only collected ${g.state.won}`);
     assert.equal(g.state.wallet,100-g.state.paid+g.state.won+g.state.direct);
+  }finally{s.dispose();}
+});
+
+
+for(const angle of [0,-LIMIT,LIMIT])test(`auto triple uses three real medals and lands near rear retraction at angle ${angle.toFixed(3)}`,()=>{
+  const g=new Game(undefined,123),s=new Simulation(g);empty(s);
+  g.state.batchSize=3;const feed=new MedalFeed(g,s);feed.setAutomatic(true);s.setAngle(angle);
+  const arrived=new Map<number,number>();
+  try {
+    for(let n=0;n<880;n++) {
+      feed.tick();s.step();assert.equal(s.anomaly,'');
+      for(const a of s.actors)if(a.source==='player') {
+        const p=s.position(a);
+        if(p.z>14&&p.y<2&&!arrived.has(a.id))arrived.set(a.id,s.time);
+      }
+    }
+    assert.equal(g.state.paid,3);assert.equal(g.state.wallet,97);assert.equal(arrived.size,3);
+    for(const time of arrived.values())assert.ok(Math.abs(time-3)<.4,`arrival at ${time}`);
+    assert.ok([...arrived.values()].every(time=>11.4+.6*Math.cos(time*Math.PI*2/3)>11.8));
+    assert.ok(s.actors.filter(a=>a.source==='player').every(a=>s.body(a).isDynamic()));
   }finally{s.dispose();}
 });

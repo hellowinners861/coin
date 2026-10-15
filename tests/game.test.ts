@@ -72,9 +72,9 @@ test('refill at zero is repeat-safe and does not count as a win or event',()=>{
 
 test('older saves keep their wallet and mute preference when adding music and refill state',()=>{
   const g=new Game(undefined,12), saved=g.export();saved.wallet=0;saved.muted=true;
-  Reflect.deleteProperty(saved,'bgm');Reflect.deleteProperty(saved,'refilled');
+  Reflect.deleteProperty(saved,'bgm');Reflect.deleteProperty(saved,'refilled');Reflect.deleteProperty(saved,'batchSize');Reflect.deleteProperty(saved,'feedQueue');Reflect.deleteProperty(saved,'feedReadyAt');
   const restored=new Game(saved);
   assert.equal(restored.state.wallet,0);assert.equal(restored.state.muted,true);
-  assert.equal(restored.state.bgm,true);assert.equal(restored.state.refilled,0);
+  assert.equal(restored.state.bgm,true);assert.equal(restored.state.refilled,0);assert.equal(restored.state.batchSize,1);assert.equal(restored.state.feedQueue,null);assert.equal(restored.state.feedReadyAt,0);
   assert.equal(restored.refillWallet(),true);
 });
