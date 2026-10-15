@@ -55,3 +55,26 @@ test('cosmetic/launch randomness cannot affect event outcomes',()=>{
   a.enqueue('normal');b.enqueue('normal');a.tick(.01);b.tick(.01);
   assert.equal(a.state.active!.result,b.state.active!.result);
 });
+
+
+test('refill at zero is repeat-safe and does not count as a win or event',()=>{
+  const g=new Game(undefined,12);g.state.wallet=0;g.state.gauge=17;
+  g.state.payouts.push({id:7,total:30,remaining:12});g.state.balls=2;
+  let saves=0;g.onDurableChange=()=>saves++;
+  assert.equal(g.refillWallet(),true);assert.equal(g.refillWallet(),false);
+  assert.equal(g.state.wallet,100);assert.equal(g.state.refilled,100);
+  assert.equal(g.state.won,0);assert.equal(g.state.direct,0);assert.equal(g.state.paid,0);
+  assert.equal(g.state.gauge,17);assert.equal(g.state.balls,2);
+  assert.equal(g.state.payouts[0].remaining,12);assert.equal(saves,1);
+  const copy=new Game(g.export());assert.equal(copy.state.wallet,100);assert.equal(copy.state.refilled,100);
+  copy.state.wallet=0;assert.equal(copy.refillWallet(),true);assert.equal(copy.state.refilled,200);
+});
+
+test('older saves keep their wallet and mute preference when adding music and refill state',()=>{
+  const g=new Game(undefined,12), saved=g.export();saved.wallet=0;saved.muted=true;
+  Reflect.deleteProperty(saved,'bgm');Reflect.deleteProperty(saved,'refilled');
+  const restored=new Game(saved);
+  assert.equal(restored.state.wallet,0);assert.equal(restored.state.muted,true);
+  assert.equal(restored.state.bgm,true);assert.equal(restored.state.refilled,0);
+  assert.equal(restored.refillWallet(),true);
+});

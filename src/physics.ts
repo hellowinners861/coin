@@ -7,6 +7,7 @@ export type Q = { x: number; y: number; z: number; w: number };
 export type Part = { size: V; at: V; rotation?: Q; material: 'steel' | 'upper' | 'green' | 'dark' | 'glass' | 'brass'; group?: 'pusher' | 'rail' | 'lift' | 'cage'; };
 export type Actor = {
   id: number; handle: number; kind: 'coin' | 'ball'; source: string; tower?: number;
+  departedFront?: boolean;
   previous: V; previousQ: Q;
 };
 type TowerPhase = 'idle' | 'lowering' | 'rising' | 'uncovering' | 'standing';
@@ -163,24 +164,37 @@ export class Simulation {
     return actor;
   }
   private seedBoard() {
-    let count=0;
+    // Scatter each loose layer with minimum spacing, then let gravity settle
+    // it. Layers use independent positions so the result is a pile, not columns.
+    const random=()=>this.game.random[3].next();
+    let lowerBase=0;
+    // A dense foundation transmits the pusher stroke. Loose offset layers
+    // above it provide the irregular, overlapping surface visible to players.
     for(let row=0;row<13;row++) for(let col=0;col<13;col++) {
-      const p=v((col-6)*1.005+(row%2)*.5025,THICKNESS/2+.004,.08+row*.885);
+      const p=v((col-6)*1.005+(row%2)*.5025+(random()-.5)*.012,THICKNESS/2+.004,.08+row*.885+(random()-.5)*.012);
       if(p.x>6.45)continue;
-      if(Math.abs(p.x-TOWER.x)<TOWER.half+.9 && Math.abs(p.z-TOWER.z)<TOWER.half+.9) continue;
-      this.spawn('coin',p,'initial'); count++;
+      if(Math.abs(p.x-TOWER.x)<TOWER.half+.9 && Math.abs(p.z-TOWER.z)<TOWER.half+.9)continue;
+      this.spawn('coin',p,'initial',yaw(random()*Math.PI*2));lowerBase++;
     }
-    // A shallow, physically supported bank at the collection edge gives the
-    // first pusher stroke something visible to work on.
-    for(let col=0;col<13;col++) {
-      this.spawn('coin',v((col-6)*1.005,THICKNESS*1.5+.009,.08),'initial');count++;
-    }
-    let index=0;
-    while(count<INITIAL_COINS) {
-      const col=index%12, row=Math.floor(index%72/12), layer=Math.floor(index/72);
-      const p=v((col-5.5)*1.025+(layer%2)*.025,1.2+THICKNESS/2+.005+layer*(THICKNESS+.003),12.10+row*1.03);
-      this.spawn('coin',p,'initial'); count++; index++;
-    }
+    const scatter=(count:number, rear:boolean)=>{
+      let layer=rear?0:1, positions:V[]=[];
+      for(let i=0;i<count;i++) {
+        let p:V|undefined;
+        for(let attempt=0;attempt<700;attempt++) {
+          const candidate=v((random()-.5)*12.7,0,rear?12.16+random()*4.8:.8+random()*10.3);
+          if(!rear && Math.abs(candidate.x-TOWER.x)<TOWER.half+.9 && Math.abs(candidate.z-TOWER.z)<TOWER.half+.9)continue;
+          if(positions.every(q=>Math.hypot(q.x-candidate.x,q.z-candidate.z)>1.015)) {p=candidate;break;}
+        }
+        if(!p) {layer++;positions=[];i--;continue;}
+        positions.push(p);
+        p.y=(rear?1.2:0)+THICKNESS/2+.018+layer*.18+random()*.012;
+        const angle=random()*Math.PI*2, tilt=(random()-.5)*.05;
+        const rotation={x:Math.sin(tilt/2)*Math.cos(angle/2),y:Math.cos(tilt/2)*Math.sin(angle/2),z:-Math.sin(tilt/2)*Math.sin(angle/2),w:Math.cos(tilt/2)*Math.cos(angle/2)};
+        this.spawn('coin',p,'initial',rotation);
+      }
+    };
+    const lower=Math.round(INITIAL_COINS*.7);
+    scatter(lower-lowerBase,false);scatter(INITIAL_COINS-lower,true);
     this.spawn('ball',v(-3.7,1.18,4.1),'initial');
     // Let the initial arrangement settle on the stationary machine.
     for(let n=0;n<100;n++) this.world.step();
@@ -294,7 +308,10 @@ export class Simulation {
     const collected: Actor[]=[];
     for(const a of this.actors) {
       const p=this.position(a);
-      if(p.z<0 && p.y < -1.25) collected.push(a);
+      // Remember crossing below the front lip. A falling medal may bounce
+      // back under the deck; it has still entered the front collection tray.
+      if(p.z<0 && p.y<-.15)a.departedFront=true;
+      if((p.z<0||a.departedFront) && p.y < -1.25) collected.push(a);
       else if(!Number.isFinite(p.x+p.y+p.z)||p.y< -8||Math.abs(p.x)>8||p.z>19) {
         this.anomaly='物理計算の異常を検出しました。保存した状態から再開できます。';
       }
