@@ -2,10 +2,11 @@ import { AUTO_WINDOW, FEED_INTERVAL, PUSHER_PERIOD, RAIL_TRAVEL_TIME } from './c
 import type { Game } from './game';
 import type { Simulation } from './physics';
 
-// Aim for the centre of the batch to land when the shelf is fully retracted.
+// Aim for the centre of the batch to land when the shelf is fully forward.
 // The same physical rail and launch velocity are used for every mode.
 export function automaticLaunchPhase(count: 1 | 3) {
-  return PUSHER_PERIOD - RAIL_TRAVEL_TIME - (count - 1) * FEED_INTERVAL / 2;
+  const lead=RAIL_TRAVEL_TIME+(count-1)*FEED_INTERVAL/2;
+  return (PUSHER_PERIOD/2-lead+PUSHER_PERIOD)%PUSHER_PERIOD;
 }
 
 export class MedalFeed {
