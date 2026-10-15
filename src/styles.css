@@ -14,3 +14,5 @@ dialog{width:min(440px,calc(100% - 36px));max-height:calc(100dvh - 48px);overflo
 @media(max-height:620px){.topbar{padding-top:9px;padding-bottom:6px}.wallet strong{font-size:25px}.controls{padding-bottom:calc(9px + env(safe-area-inset-bottom))}.supply-status{margin-bottom:3px}.insert{min-height:49px}.bottom-note{margin-top:5px}.progress-bar{top:6px}.event-panel{top:36px}.cover-content{padding:20px}.cover-content p{margin-bottom:13px}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
 @media(max-height:450px){.cover{position:fixed;padding:15px}.cover-content{max-height:calc(100dvh - 30px);overflow:auto;padding:14px}.progress-bar{display:none}}
+
+.start-sound{display:flex;align-items:center;justify-content:center;gap:8px;margin:0 0 16px;font-size:11px;color:#b8c3ae;min-height:30px}.start-sound input{accent-color:#c2b285;width:17px;height:17px}.refill-link{display:block;margin:0 auto 6px;padding:6px 12px;border:1px solid #a4a08566;border-radius:3px;color:#e0d4af}.refill-link[hidden]{display:none}#refill .reset-actions{margin-top:22px}

@@ -30,6 +30,7 @@ app.innerHTML=`
         <p class="eyebrow">coin</p><h1 id="cover-title">盤面を準備しています</h1>
         <p id="cover-copy">メダルの位置を整えています。</p>
         <div id="loading" class="loading-line"></div>
+        <label class="start-sound"><input id="start-sound" type="checkbox" disabled /> BGM・効果音をつける</label>
         <button type="button" class="primary" id="start" hidden>はじめる</button>
         <button type="button" class="secondary" id="start-new" hidden>はじめから</button>
         <p class="notice" id="boot-notice" hidden></p>
@@ -38,6 +39,7 @@ app.innerHTML=`
     <div id="diagnostics" class="diagnostics" hidden></div>
   </main>
   <footer class="controls">
+    <button type="button" id="refill-open" class="help-link refill-link" hidden>メダルを100枚追加</button>
     <div class="supply-status" id="supply">手前から奥へ。狙いを決めて、メダルを投入。</div>
     <div class="control-row">
       <div class="aim">
@@ -51,6 +53,7 @@ app.innerHTML=`
   <dialog id="settings">
     <div class="dialog-header"><h2>設定</h2><button type="button" data-close>閉じる</button></div>
     <label class="setting">サウンド<input id="sound" type="checkbox" /></label>
+    <label class="setting">BGM<input id="bgm" type="checkbox" checked /></label>
     <label class="setting">獲得時の振動<input id="vibration" type="checkbox" checked /></label>
     <label class="setting">描画品質<select id="quality"><option value="high">標準</option><option value="low">軽量</option></select></label>
     <div class="stats"><span>獲得メダル<strong id="stat-won">0</strong></span><span>投入メダル<strong id="stat-paid">0</strong></span><span>JP回数<strong id="stat-jp">0</strong></span></div>
@@ -59,9 +62,14 @@ app.innerHTML=`
     <div id="reset-prompt" class="reset-prompt" hidden><p>現在の盤面を終了し、手持ち100枚から始めます。</p><div class="reset-actions"><button type="button" class="secondary" id="reset-cancel">キャンセル</button><button type="button" class="primary" id="reset-confirm">はじめから</button></div></div>
     <button type="button" class="primary resume" data-close>盤面へ戻る</button>
   </dialog>
+  <dialog id="refill" aria-labelledby="refill-title" aria-describedby="refill-copy">
+    <div class="dialog-header"><h2 id="refill-title">メダルを追加しますか？</h2></div>
+    <p id="refill-copy">手持ちが0枚になりました。100枚を無料で追加して、この盤面の続きを遊べます。</p>
+    <div class="reset-actions"><button type="button" class="secondary" id="refill-cancel">落下を待つ</button><button type="button" class="primary" id="refill-confirm">はい、100枚追加</button></div>
+  </dialog>
   <dialog id="help">
     <div class="dialog-header"><h2>遊び方</h2><button type="button" data-close>閉じる</button></div>
-    <ul><li>投入口を左右に振り、投入ボタンで1枚。長押しで連続投入できます。</li><li>メダルは手前から奥へ転がり、上段に落ちます。台の動きに合わせて狙ってみましょう。</li><li>手前へ落ちたメダルを獲得。横落ちはありません。</li><li>30枚獲得するごとにイベント。ボール3個の回収でジャックポット抽選です。</li><li>タワーは右奥の搬入口に空きができると登場します。土台のメダルを押して崩しましょう。</li><li>手持ちが0枚になっても、落下と報酬を待てます。</li></ul>
+    <ul><li>投入口を左右に振り、投入ボタンで1枚。長押しで連続投入できます。</li><li>メダルは手前から奥へ転がり、上段に落ちます。台の動きに合わせて狙ってみましょう。</li><li>手前へ落ちたメダルを獲得。横落ちはありません。</li><li>30枚獲得するごとにイベント。ボール3個の回収でジャックポット抽選です。</li><li>タワーは右奥の搬入口に空きができると登場します。土台のメダルを押して崩しましょう。</li><li>手持ちが0枚になると100枚を無料で追加できます。「落下を待つ」を選んだ後も、画面下の追加ボタンから受け取れます。</li></ul>
     <h3>報酬の受け取り方</h3><p>「10枚獲得」は手持ちに直接加算。「30枚払出し」「JP 300枚」は盤面にメダルを供給します。手前に落とすと手持ちに加わります。</p>
     <details><summary>抽選の確率とボール追加</summary><p>通常イベント：報酬なし40%、10枚35%、ボール18%、タワー4%、JP抽選2%、JP直撃1%。JP抽選：10枚70%、盤面へ30枚20%、JP10%。</p><p>手持ちから5枚投入するごとに20%でボール追加。盤面のボールは最大3個で、当選済みの追加報酬は空きができるまで保留されます。</p></details>
     <p>PCでは左右キーで向きを調整し、スペースキーで投入できます。</p>
@@ -70,13 +78,13 @@ app.innerHTML=`
 
 const $=<T extends HTMLElement=HTMLElement>(id:string)=>document.getElementById(id) as T;
 const scene=$('scene'),cover=$('cover'),insert=$<HTMLButtonElement>('insert');
-const settings=$<HTMLDialogElement>('settings'),help=$<HTMLDialogElement>('help');
+const settings=$<HTMLDialogElement>('settings'),help=$<HTMLDialogElement>('help'),refill=$<HTMLDialogElement>('refill');
 const audio=new MachineAudio(),store=new SaveStore();
 let game:Game,sim:Simulation,view:BoardView;
 let ready=false,paused=true,storageAvailable=false,saveWanted=false,saving=false;
 let lastSave=0,holding=false,wantInput=false,lastInput=-10,drag:number|null=null,dragX=0,dragAngle=0;
 let lastFrame=0,accumulator=0,lastDraw=0,lastUI=0,lastWon=0,winUntil=0,winBatch=0;
-let hasOldSave=false,saveIssue='',lastEventKey='';
+let hasOldSave=false,saveIssue='',lastEventKey='',refillAsked=false;
 const debug=new URLSearchParams(location.search).has('debug');
 let fpsFrames=0,fpsTime=0,fps=0,physicsMs=0;
 
@@ -86,7 +94,9 @@ function bindGame() {
   game.onSound=type=>{audio.play(type);if(type==='ball'||type==='jackpot'||type==='tower')vibrate(type==='jackpot'?[35,60,35]:15);};
   game.onDurableChange=()=>{saveWanted=true;};
   sim.onImpact=force=>audio.impact(force);
-  audio.muted=game.state.muted;
+  audio.muted=game.state.muted;audio.bgm=game.state.bgm;
+  $<HTMLInputElement>('bgm').checked=game.state.bgm;
+  $<HTMLInputElement>('start-sound').checked=!game.state.muted;
   $('sound') instanceof HTMLInputElement && ($<HTMLInputElement>('sound').checked=!game.state.muted);
   $<HTMLInputElement>('vibration').checked=game.state.vibration;
   $<HTMLSelectElement>('quality').value=game.state.quality;
@@ -102,26 +112,31 @@ async function save(force=false) {
   finally {saving=false;}
 }
 function pause() {
-  if(!ready)return;paused=true;release();accumulator=0;saveWanted=true;void save(true);
+  if(!ready)return;paused=true;audio.setPlaying(false);release();accumulator=0;saveWanted=true;void save(true);
 }
 function resume() {
   if(!ready||sim.anomaly)return;
-  audio.unlock();paused=false;cover.hidden=true;accumulator=0;lastFrame=performance.now();
+  audio.unlock();audio.setPlaying(true);paused=false;cover.hidden=true;accumulator=0;lastFrame=performance.now();
   hasOldSave=false;saveWanted=true;
 }
 function openDialog(dialog:HTMLDialogElement) {if(!ready)return;pause();dialog.showModal();}
 async function reset() {
   pause();
-  const preferences={muted:game.state.muted,vibration:game.state.vibration,quality:game.state.quality};
+  const preferences={bgm:game.state.bgm,muted:game.state.muted,vibration:game.state.vibration,quality:game.state.quality};
   sim.dispose();game=new Game();Object.assign(game.state,preferences);sim=new Simulation(game);
-  view.simulation=sim;bindGame();lastWon=winBatch=0;lastEventKey='';lastInput=-10;
+  view.simulation=sim;bindGame();refillAsked=false;lastWon=winBatch=0;lastEventKey='';lastInput=-10;
   hasOldSave=false;sim.anomaly='';$('reset-prompt').hidden=true;
   if(settings.open)settings.close();
-  cover.hidden=true;paused=false;lastFrame=performance.now();saveWanted=true;await save(true);updateUI();
+  cover.hidden=true;audio.unlock();audio.setPlaying(true);paused=false;lastFrame=performance.now();saveWanted=true;await save(true);updateUI();
 }
 function updateUI() {
   if(!ready)return;
   const s=game.state;
+  if(s.wallet>0)refillAsked=false;
+  if(s.wallet===0&&!refillAsked&&!paused&&cover.hidden&&!document.hidden) {
+    refillAsked=true;openDialog(refill);
+  }
+  $('refill-open').hidden=s.wallet!==0;
   $('wallet').textContent=s.wallet.toLocaleString('ja-JP');
   $('event-remaining').textContent=`${30-s.gauge}枚`;
   $('ball-count').textContent=`${s.balls} / 3`;
@@ -139,7 +154,7 @@ function updateUI() {
   if(s.ballJobs)supply.push(`ボール待ち ${s.ballJobs}個`);
   if(s.queue.length)supply.push(`抽選保留 ${s.queue.length}件`);
   if(!sim.hasCapacity())supply.push('落下を待っています');
-  $('supply').textContent=supply.join(' ／ ')||(s.wallet===0?'落下と報酬を待てます。再挑戦は設定から。':'手前へ落ちたメダルを獲得。ボール3個でJP抽選。');
+  $('supply').textContent=supply.join(' ／ ')||(s.wallet===0?'落下を待つか、100枚追加して続けられます。':'手前へ落ちたメダルを獲得。ボール3個でJP抽選。');
   $('stat-won').textContent=s.won.toLocaleString('ja-JP');$('stat-paid').textContent=s.paid.toLocaleString('ja-JP');$('stat-jp').textContent=String(s.jackpots);
   $('save-state').textContent=saveIssue||(saving?'保存中…':storageAvailable?'自動保存':'保存を利用できません');
   const active=s.active,label=game.activeLabel(),panel=$('event');
@@ -182,8 +197,18 @@ window.addEventListener('keydown',e=>{
 window.addEventListener('keyup',e=>{if(e.code==='Space')release();});
 $('settings-open').addEventListener('click',()=>openDialog(settings));$('help-open').addEventListener('click',()=>openDialog(help));
 document.querySelectorAll<HTMLButtonElement>('[data-close]').forEach(button=>button.addEventListener('click',()=>button.closest('dialog')!.close()));
-for(const dialog of [settings,help])dialog.addEventListener('close',()=>{if(!cover.hidden||sim.anomaly)return;resume();});
-$('sound').addEventListener('change',()=>{audio.unlock();game.state.muted=!$<HTMLInputElement>('sound').checked;audio.muted=game.state.muted;saveWanted=true;void save(true);});
+for(const dialog of [settings,help,refill])dialog.addEventListener('close',()=>{if(!cover.hidden||sim.anomaly)return;resume();});
+function setSound(enabled:boolean) {
+  audio.unlock();game.state.muted=!enabled;audio.muted=!enabled;
+  $<HTMLInputElement>('sound').checked=enabled;$<HTMLInputElement>('start-sound').checked=enabled;
+  saveWanted=true;void save(true);
+}
+$('sound').addEventListener('change',()=>setSound($<HTMLInputElement>('sound').checked));
+$('start-sound').addEventListener('change',()=>setSound($<HTMLInputElement>('start-sound').checked));
+$('bgm').addEventListener('change',()=>{audio.unlock();game.state.bgm=$<HTMLInputElement>('bgm').checked;audio.bgm=game.state.bgm;saveWanted=true;void save(true);});
+$('refill-open').addEventListener('click',()=>{refillAsked=true;openDialog(refill);});
+$('refill-cancel').addEventListener('click',()=>refill.close());
+$('refill-confirm').addEventListener('click',()=>{game.refillWallet();refill.close();void save(true);updateUI();});
 $('vibration').addEventListener('change',()=>{game.state.vibration=$<HTMLInputElement>('vibration').checked;saveWanted=true;void save(true);});
 $('quality').addEventListener('change',()=>{game.state.quality=$<HTMLSelectElement>('quality').value as 'high'|'low';view.quality(game.state.quality==='low');saveWanted=true;void save(true);});
 $('reset-open').addEventListener('click',()=>{$('reset-prompt').hidden=false;});
@@ -192,7 +217,7 @@ $('reset-confirm').addEventListener('click',()=>{void reset();});
 $('skip').addEventListener('click',()=>game.skip());$('start').addEventListener('click',resume);
 $('start-new').addEventListener('click',()=>openDialog(settings));
 document.addEventListener('visibilitychange',()=>{
-  if(document.hidden) {pause();if(ready&&cover.hidden&&!settings.open&&!help.open){cover.hidden=false;$('cover-title').textContent='一時停止';$('cover-copy').textContent='盤面の動きを止めています。続きから遊べます。';$('start').hidden=false;$('start').textContent='つづける';}}
+  if(document.hidden) {pause();void audio.context?.suspend();if(ready&&cover.hidden&&!settings.open&&!help.open&&!refill.open){cover.hidden=false;$('cover-title').textContent='一時停止';$('cover-copy').textContent='盤面の動きを止めています。続きから遊べます。';$('start').hidden=false;$('start').textContent='つづける';}}
 });
 window.addEventListener('pagehide',()=>{pause();});
 
@@ -208,7 +233,7 @@ async function boot() {
       try {game=new Game(old.game);sim=new Simulation(game,old.physics);hasOldSave=true;}
       catch {invalidSave=true;game=new Game();sim=new Simulation(game);}
     } else {invalidSave=!!old;game=new Game();sim=new Simulation(game);}
-    view=new BoardView(scene,sim);bindGame();ready=true;lastWon=game.state.won;
+    view=new BoardView(scene,sim);bindGame();ready=true;$<HTMLInputElement>('start-sound').disabled=false;lastWon=game.state.won;
     $('loading').hidden=true;$('cover-title').textContent='メダルプッシャー';
     $('cover-copy').innerHTML='投入口を左右に振って、奥へ。<br>重なったメダルを、手前へ。';
     $('start').hidden=false;$('start').textContent=hasOldSave?'つづきから':'100枚で はじめる';
@@ -242,6 +267,7 @@ function frame(now:number) {
     if(steps===10)accumulator=Math.min(accumulator,DT);
     if(saveWanted||sim.time-lastSave>=4)void save();
   }
+  audio.update();
   const interval=game.state.quality==='low'?1000/30:0;
   if(now-lastDraw>=interval) {view.render(paused?1:Math.min(accumulator/DT,1));lastDraw=now;fpsFrames++;}
   if(now-fpsTime>1000){fps=fpsFrames*1000/(now-fpsTime);fpsFrames=0;fpsTime=now;}
