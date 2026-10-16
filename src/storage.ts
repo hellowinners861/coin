@@ -36,7 +36,7 @@ export class SaveStore {
       physics.world instanceof Uint8Array&&physics.world.length>0&&
       Array.isArray(physics.actors)&&physics.actors.every(a=>Number.isFinite(a.handle)&&vector(a.previous)&&vector(a.previousQ)&&Number.isFinite(a.previousQ.w))&&
       Array.isArray(game.random)&&game.random.length===4&&game.random.every(Number.isFinite)&&
-      Array.isArray(game.queue)&&game.queue.every(t=>Number.isSafeInteger(t.id)&&['normal','jpc'].includes(t.kind))&&
+      Array.isArray(game.queue)&&game.queue.every(t=>Number.isSafeInteger(t.id)&&['normal','jpc','mini','station'].includes(t.kind))&&
       Array.isArray(game.payouts)&&game.payouts.every(p=>Number.isSafeInteger(p.remaining)&&p.remaining>0&&p.remaining<=p.total)&&
       Number.isFinite(physics.time+physics.angle+physics.targetAngle);
   }

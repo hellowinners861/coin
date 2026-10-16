@@ -19,7 +19,7 @@ export const outcome:Record<Result,Cut[]>={
  FIELD_5:[c('bg02','nagi','小さな便も、大事だね。','joy')],
  CREDIT_10:[c('bg03','nagi','左から来るよ。受け取ろう！','joy'),c('bg03','garo','奥へ、送るぞ。')],
  BALL_1:[c('bg03','mina','カプセル便、追加！','joy')],
- TOWER_STANDARD:[c('bg04','garo','まとめ荷、運ぶぞ。','joy'),c('bg04','nagi','搬入口が空いたら、お願い！')],
+ TOWER_STANDARD:[c('bg04','garo','まとめ荷、運ぶぞ。','joy'),c('bg04','nagi','床の扉、開くよ。せり上げ開始！')],
  JPC_ENTRY:[c('bg05','mina','特別便の伝票だ！','surprise'),c('bg05','garo','ドックを開ける。')],
  FIELD_30:[c('bg03','mina','通常便、出港！','joy'),c('bg03','nagi','荷物、運んでくる！','joy')],
  JACKPOT:[c('bg06','mina','特別便、出港！','joy'),c('bg06','garo','積み込み、始めるぞ。','joy')],

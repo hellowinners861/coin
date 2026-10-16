@@ -4,18 +4,19 @@ import type { Game } from './game';
 
 export type V = { x: number; y: number; z: number };
 export type Q = { x: number; y: number; z: number; w: number };
-export type Part = { size: V; at: V; rotation?: Q; material: 'steel' | 'upper' | 'green' | 'dark' | 'glass' | 'brass'; group?: 'pusher' | 'rail' | 'lift' | 'cage'; };
+export type Part = { size: V; at: V; rotation?: Q; material: 'steel' | 'upper' | 'green' | 'dark' | 'glass' | 'brass'; group?: 'pusher' | 'rail' | 'lift' | 'cage' | 'hatchFront' | 'hatchRear'; };
 export type Actor = {
   id: number; handle: number; kind: 'coin' | 'ball' | 'miniBall'; source: string; tower?: number;
   departedFront?: boolean;
   previous: V; previousQ: Q;
 };
-type TowerPhase = 'idle' | 'lowering' | 'rising' | 'uncovering' | 'standing';
+type TowerPhase = 'closing' | 'loading' | 'opening' | 'idle' | 'lowering' | 'rising' | 'uncovering' | 'standing';
 export type PhysicsSave = {
   world: Uint8Array; actors: Actor[]; time: number; angle: number; targetAngle: number;
   nextId: number; pusher: number; rail: number; lift: number; cage: number;
   towerPhase: TowerPhase; towerTime: number; towerId: number; towerBorn: number;
   payoutClock: number; ballClock: number; collisions: number;
+  hatchFront?:number; hatchRear?:number; legacyTower?:boolean; towerLiftStart?:number; towerHatchStart?:number;
   pusherTime?: number; pusherPeriod?: number; pusherHalfStroke?: number; rewardHolding?: boolean; miniBallClock?: number; rewardWait?: number;
 };
 export const v = (x: number, y: number, z: number): V => ({ x, y, z });
@@ -35,6 +36,8 @@ export function machineParts(): Part[] {
   box(v(h*2, .4, z-h), v(x, -.2, (z-h)/2), 'steel');
   box(v(h*2, .4, 18-z-h), v(x, -.2, (z+h+18)/2), 'steel');
   box(v(h*2-.015, .24, h*2-.015), v(0, 0, 0), 'steel', 'lift');
+  box(v(h*2-.015,.08,h-.008),v(0,0,0),'steel','hatchFront');
+  box(v(h*2-.015,.08,h-.008),v(0,0,0),'steel','hatchRear');
   // Enclosed pit: a lift never creates a side-loss route.
   for (const s of [-1, 1]) {
     box(v(.12, 5.5, h*2+.2), v(x+s*(h+.07), -2.75, z), 'dark');
@@ -88,6 +91,7 @@ export class Simulation {
   pusherTime = 0; rewardHolding = false; miniBallClock = 0; rewardWait = 0;
   pusherHalfStroke = PUSHER_HALF_STROKE;
   pusher: RAPIER.RigidBody; rail: RAPIER.RigidBody; lift: RAPIER.RigidBody; cage: RAPIER.RigidBody;
+  hatchFront!:RAPIER.RigidBody; hatchRear!:RAPIER.RigidBody;legacyTower=false;towerLiftStart=-.12;towerHatchStart=0;
   towerPhase: TowerPhase = 'idle'; towerTime = 0; towerId = 0; towerBorn = 0;
   payoutClock = 0; ballClock = 0; collisions = 0; anomaly = '';
   onImpact: (force: number) => void = () => {};
@@ -116,8 +120,11 @@ export class Simulation {
       this.towerId=saved.towerId; this.towerBorn=saved.towerBorn;
       this.payoutClock=saved.payoutClock; this.ballClock=saved.ballClock;
       this.collisions=saved.collisions;
-      this.reserved=this.towerPhase==='lowering'?TOWER.size:0;
-      if(!this.pusher||!this.rail||!this.lift||!this.cage||this.actors.some(a=>!this.world.getRigidBody(a.handle))) {
+      this.reserved=['closing','lowering'].includes(this.towerPhase)?TOWER.size:0;
+      this.legacyTower=saved.legacyTower??(saved.hatchFront===undefined&&this.towerPhase!=='idle');
+      this.towerLiftStart=saved.towerLiftStart??this.lift.translation().y/D;this.towerHatchStart=saved.towerHatchStart??1;
+      if(saved.hatchFront!==undefined&&saved.hatchRear!==undefined){this.hatchFront=this.world.getRigidBody(saved.hatchFront);this.hatchRear=this.world.getRigidBody(saved.hatchRear);}else this.addHatches(this.towerPhase!=='idle');
+      if(!this.pusher||!this.rail||!this.lift||!this.cage||!this.hatchFront||!this.hatchRear||this.actors.some(a=>!this.world.getRigidBody(a.handle))) {
         this.events.free();this.world.free();throw new Error('保存された盤面の剛体を復元できません');
       }
       // Match restored collision shapes to the new visible mini-ball size.
@@ -143,9 +150,11 @@ export class Simulation {
     const kinematic = (p: V) => this.world.createRigidBody(RAPIER.RigidBodyDesc.kinematicPositionBased().setTranslation(...Object.values(enginePoint(p)) as [number,number,number]));
     this.pusher = kinematic(v(0,0,PUSHER_CENTER+PUSHER_HALF_STROKE));
     this.rail = kinematic(v(0,0,-1));
-    this.lift = kinematic(v(TOWER.x,-.12,TOWER.z));
+    this.lift = kinematic(v(TOWER.x,-4.32,TOWER.z));
     this.cage = kinematic(v(TOWER.x,-4.7,TOWER.z));
+    this.addHatches(false);
     for (const part of this.parts) {
+      if(part.group==='hatchFront'||part.group==='hatchRear')continue;
       const { size, at, rotation, group } = part;
       const desc = RAPIER.ColliderDesc.cuboid(size.x*D/2,size.y*D/2,size.z*D/2)
         .setTranslation(at.x*D,at.y*D,at.z*D).setFriction(.35).setRestitution(.03);
@@ -155,6 +164,14 @@ export class Simulation {
     }
     this.seedBoard();
   }
+  private addHatches(open:boolean){
+    for(const [group,sign] of [['hatchFront',-1],['hatchRear',1]] as const){
+      const body=this.world.createRigidBody(RAPIER.RigidBodyDesc.kinematicPositionBased().setTranslation(TOWER.x*D,-.032*D,(TOWER.z+sign*(.75+(open?1.55:0)))*D));
+      this[group]=body;
+      for(const p of this.parts.filter(p=>p.group===group))this.world.createCollider(RAPIER.ColliderDesc.cuboid(p.size.x*D/2,p.size.y*D/2,p.size.z*D/2).setFriction(.85).setRestitution(0),body);
+    }
+  }
+  private moveHatches(open:number){for(const [body,sign] of [[this.hatchFront,-1],[this.hatchRear,1]] as const)body.setNextKinematicTranslation(enginePoint(v(TOWER.x,-.032,TOWER.z+sign*(.75+1.55*open))));}
   body(a: Actor) { return this.world.getRigidBody(a.handle); }
   coins() { return this.actors.filter(a=>a.kind==='coin').length; }
   balls() { return this.actors.filter(a=>a.kind==='ball').length; }
@@ -165,6 +182,7 @@ export class Simulation {
     return {
       world:this.world.takeSnapshot(), actors:structuredClone(this.actors),
       time:this.time,angle:this.angle,targetAngle:this.targetAngle,nextId:this.nextId,
+      hatchFront:this.hatchFront.handle,hatchRear:this.hatchRear.handle,legacyTower:this.legacyTower,towerLiftStart:this.towerLiftStart,towerHatchStart:this.towerHatchStart,
       pusher:this.pusher.handle,rail:this.rail.handle,lift:this.lift.handle,cage:this.cage.handle,
       towerPhase:this.towerPhase,towerTime:this.towerTime,towerId:this.towerId,towerBorn:this.towerBorn,
       payoutClock:this.payoutClock,ballClock:this.ballClock,collisions:this.collisions,
@@ -247,19 +265,16 @@ export class Simulation {
     return true;
   }
   setAngle(angle: number) { this.targetAngle=Math.max(-LIMIT,Math.min(LIMIT,angle)); }
-  private clearArea(x: number,z: number,half: number,above=-1) {
-    return !this.actors.some(a=>{const p=this.position(a);const r=a.kind==='ball'?1.1:a.kind==='miniBall'?MINI_BALL_RADIUS:.5;return p.y>above&&Math.abs(p.x-x)<half+r&&Math.abs(p.z-z)<half+r;});
-  }
   private clearSpawn(p: V, radius: number) {
     return !this.actors.some(a=>{
       const q=this.position(a),r=a.kind==='ball'?1.1:a.kind==='miniBall'?MINI_BALL_RADIUS:.51;
       return Math.hypot(q.x-p.x,q.y-p.y,q.z-p.z)<radius+r+.02;
     });
   }
-  private tickTower() {
+  private tickLegacyTower() {
     const phase=this.towerPhase;
     if(phase==='idle') {
-      if(this.game.state.towerJobs && this.hasCapacity(TOWER.size) && this.clearArea(TOWER.x,TOWER.z,TOWER.half+.25)) {
+      if(this.game.state.towerJobs && this.hasCapacity(TOWER.size)) {
         this.towerPhase='lowering'; this.towerTime=0; this.towerId++;
         this.reserved=TOWER.size; this.game.state.towerJobs--; this.game.onDurableChange();
       }
@@ -296,6 +311,44 @@ export class Simulation {
       const members=this.actors.filter(a=>a.tower===this.towerId);
       const high=members.filter(a=>this.position(a).y>1.15).length;
       if(high<12) { this.towerPhase='idle'; this.game.onDurableChange(); }
+    }
+  }
+  private tickTower(){
+    if(this.legacyTower&&this.towerPhase!=='idle'){this.tickLegacyTower();return;}
+    const s=this.game.state,phase=this.towerPhase,smooth=(t:number)=>t*t*(3-2*t);
+    if(phase==='idle'){
+      if(s.towerJobs&&this.hasCapacity(TOWER.size)){
+        this.legacyTower=false;this.towerPhase='closing';this.towerTime=0;this.towerId++;this.reserved=TOWER.size;s.towerJobs--;
+        this.towerHatchStart=Math.max(0,Math.min(1,(TOWER.z-this.hatchFront.translation().z/D-.75)/1.55));this.game.onDurableChange();
+      }return;
+    }
+    this.towerTime+=DT;
+    const next=(phase:TowerPhase)=>{this.towerPhase=phase;this.towerTime=0;this.game.onDurableChange();};
+    if(phase==='closing'){
+      const t=Math.min(this.towerTime/.65,1);this.moveHatches(this.towerHatchStart*(1-smooth(t)));
+      if(t===1){this.towerLiftStart=this.lift.translation().y/D;next('lowering');}
+    }else if(phase==='lowering'){
+      const t=Math.min(this.towerTime/.75,1),y=this.towerLiftStart+(-4.32-this.towerLiftStart)*smooth(t);
+      this.lift.setNextKinematicTranslation(enginePoint(v(TOWER.x,y,TOWER.z)));
+      if(t===1){
+        for(let layer=0;layer<40;layer++)for(let i=0;i<3;i++){const angle=i*Math.PI*2/3+(layer%2)*Math.PI/24;this.spawn('coin',v(TOWER.x+Math.cos(angle)*.59,-4.32+.12+THICKNESS/2+.003+layer*(THICKNESS+.002),TOWER.z+Math.sin(angle)*.59),'tower',defaultRotation,v(0,0,0),this.towerId);}
+        this.reserved=0;this.cage.setNextKinematicTranslation(enginePoint(v(TOWER.x,-4.32,TOWER.z)));next('loading');
+      }
+    }else if(phase==='loading'){
+      if(this.towerTime>=.4)next('opening');
+    }else if(phase==='opening'){
+      const t=Math.min(this.towerTime/.7,1),f=smooth(t),y=-4.32+.72*f;this.moveHatches(f);
+      this.lift.setNextKinematicTranslation(enginePoint(v(TOWER.x,y,TOWER.z)));this.cage.setNextKinematicTranslation(enginePoint(v(TOWER.x,y,TOWER.z)));
+      if(t===1)next('rising');
+    }else if(phase==='rising'){
+      const t=Math.min(this.towerTime/3.5,1),y=-3.6+3.48*smooth(t);
+      this.lift.setNextKinematicTranslation(enginePoint(v(TOWER.x,y,TOWER.z)));this.cage.setNextKinematicTranslation(enginePoint(v(TOWER.x,y,TOWER.z)));
+      if(t===1)next('uncovering');
+    }else if(phase==='uncovering'){
+      const t=Math.min(this.towerTime/2,1);this.cage.setNextKinematicTranslation(enginePoint(v(TOWER.x,-.12-4.6*smooth(t),TOWER.z)));
+      if(t===1){this.towerBorn=this.time;next('standing');for(const a of this.actors)if(a.tower===this.towerId)this.body(a).wakeUp();this.game.onSound('tower');}
+    }else if(phase==='standing'&&this.time-this.towerBorn>3){
+      if(this.actors.filter(a=>a.tower===this.towerId&&this.position(a).y>1.15).length<12)next('idle');
     }
   }
   private tickRewards() {

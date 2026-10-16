@@ -75,7 +75,7 @@ export class BoardView {
       glass:new THREE.MeshPhysicalMaterial({color:'#d8e4df',metalness:0,roughness:.08,transparent:true,opacity:.065,depthWrite:false,side:THREE.DoubleSide,ior:1.45,specularIntensity:.25}),
       brass:new THREE.MeshStandardMaterial({color:'#a68b5d',metalness:.82,roughness:.38}),
     };
-    for(const name of ['pusher','rail','lift','cage']) {this.groups[name]=new THREE.Group();this.scene.add(this.groups[name]);}
+    for(const name of ['pusher','rail','lift','cage','hatchFront','hatchRear']) {this.groups[name]=new THREE.Group();this.scene.add(this.groups[name]);}
     const box=(part:Part, visualOnly=false) => {
       const {size,at,group}=part;
       const isGlass=part.material==='glass';
@@ -178,7 +178,7 @@ export class BoardView {
     this.dummy.scale.set(1,1,1);this.dummy.updateMatrix();
   }
   render(alpha=1) {
-    for(const name of ['pusher','rail','lift','cage'] as const) {
+    for(const name of ['pusher','rail','lift','cage','hatchFront','hatchRear'] as const) {
       const body=this.simulation[name],p=body.translation(),q=body.rotation();
       this.groups[name].position.set(p.x/D,p.y/D,p.z/D);this.groups[name].quaternion.set(q.x,q.y,q.z,q.w);
     }
