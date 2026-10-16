@@ -85,17 +85,35 @@ test('a small physical ball is collected once and queues ten medals after restor
   }finally{s.dispose();resumed.dispose();}
 });
 
-test('new mini balls enter one medal diameter higher and fall onto the upper shelf',()=>{
+test('double-diameter mini balls launch above the lower deck and stay in front of the pusher',()=>{
   const g=new Game(undefined,123),s=new Simulation(g);empty(s);g.state.miniBallJobs=1;
   try {
     s.step();const mini=s.actors.find(a=>a.kind==='miniBall')!;
     assert.ok(mini);assert.equal(g.state.miniBallJobs,0);
     assert.ok(Math.abs(s.position(mini).y-3.6)<.02);
-    assert.equal(MINI_BALL_SUPPLY.y-2.6,1);
-    for(let n=0;n<160;n++){s.step();assert.equal(s.anomaly,'');}
+    assert.equal(MINI_BALL_RADIUS*2,1.28);
+    assert.ok(MINI_BALL_SUPPLY.z+MINI_BALL_RADIUS<PUSHER_CENTER-PUSHER_HALF_STROKE);
+    for(let n=0;n<400;n++){
+      s.step();assert.equal(s.anomaly,'');
+      assert.ok(s.position(mini).z+MINI_BALL_RADIUS<s.pusher.translation().z);
+    }
     assert.ok(s.actors.includes(mini));assert.ok(s.position(mini).y<2);
-    assert.ok(s.position(mini).z>12&&s.position(mini).z<18);
+    assert.ok(s.position(mini).z>0&&s.position(mini).z<10);
   }finally{s.dispose();}
+});
+
+test('old mini-ball snapshots enlarge their collider without moving or rewarding the ball',()=>{
+  const g=new Game(undefined,123),s=new Simulation(g);empty(s);
+  const mini=s.spawn('miniBall',v(0,2,4),'old-mini');
+  s.body(mini).collider(0).setShape(new RAPIER.Ball(.32));
+  const position=s.position(mini),copy=new Game(g.export()),resumed=new Simulation(copy,s.export());
+  try {
+    const restored=resumed.actors[0];
+    assert.deepEqual(resumed.position(restored),position);
+    assert.ok(Math.abs((resumed.body(restored).collider(0).shape as RAPIER.Ball).radius-.64)<1e-6);
+    assert.equal(copy.state.miniBallsCollected,0);assert.equal(copy.state.payouts.length,0);
+    for(let n=0;n<300;n++){resumed.step();assert.equal(resumed.anomaly,'');}
+  }finally{s.dispose();resumed.dispose();}
 });
 
 test('side rewards wait for forward shelf, hold it, and preserve remaining shots on restore',()=>{

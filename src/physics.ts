@@ -120,6 +120,15 @@ export class Simulation {
       if(!this.pusher||!this.rail||!this.lift||!this.cage||this.actors.some(a=>!this.world.getRigidBody(a.handle))) {
         this.events.free();this.world.free();throw new Error('保存された盤面の剛体を復元できません');
       }
+      // Match restored collision shapes to the new visible mini-ball size.
+      // Keep positions, velocities and already earned rewards unchanged.
+      for(const a of this.actors)if(a.kind==='miniBall') {
+        const b=this.body(a),c=b.collider(0);
+        if(Math.abs((c.shape as RAPIER.Ball).radius-MINI_BALL_RADIUS*D)>1e-6) {
+          c.setShape(new RAPIER.Ball(MINI_BALL_RADIUS*D));c.setMass(.002);
+          b.recomputeMassPropertiesFromColliders();b.wakeUp();
+        }
+      }
       return;
     }
     this.world = new RAPIER.World(v(0, -9.81 / METRES_PER_UNIT, 0));
@@ -313,7 +322,7 @@ export class Simulation {
     if(s.miniBallJobs && this.miniBalls()<MINI_BALL_LIMIT && this.miniBallClock<=0) {
       const p=v(MINI_BALL_SUPPLY.x,MINI_BALL_SUPPLY.y,MINI_BALL_SUPPLY.z);
       if(this.clearSpawn(p,MINI_BALL_RADIUS)) {
-        this.spawn('miniBall',p,'reward');s.miniBallJobs--;this.miniBallClock=2;
+        this.spawn('miniBall',p,'reward',defaultRotation,v(.6,0,-2));s.miniBallJobs--;this.miniBallClock=2;
         this.game.onDurableChange();
       }
     }
