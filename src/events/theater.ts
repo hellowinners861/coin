@@ -4,6 +4,7 @@ import { PhysicalDraw,type DrawPlan,type DrawSnapshot } from './draw';
 import { DrawView } from './draw-view';
 import { at,diaries,idle,intro,jpIntro,names,outcome,type Cut,type Character } from './scripts';
 import './theater.css';
+import './compact-monitor.css';
 import {routes,progressPhase,reelLabels,revealTime,stops} from './challenge';
 import { REFIT_CHOICE_SECONDS } from './jp';
 const asset=(name:string)=>new URL(`events/${name}.webp`,document.baseURI).href;
@@ -26,8 +27,9 @@ export class Theater {
    <section class="draw-window" aria-label="特別便のボール抽選" hidden><header class="movie-bar"><span>特別便のドック</span><div><button type="button" data-action="watch-story">物語へ</button><button type="button" data-action="draw-move">小さく ↑</button></div></header><div class="jp-meter"><span></span><div class="jp-pockets" aria-hidden="true">${Array(10).fill('<i></i>').join('')}</div></div><div class="draw-surface" role="img" aria-label="10個の穴と白い抽選球。球が入った穴の報酬を獲得"></div><div class="draw-note" aria-live="polite"></div><div class="refit-actions" hidden><button type="button" data-refit="depart">この状態で出航</button><button type="button" data-refit="continue">もう1球</button></div><button type="button" class="retry-draw" hidden>球を入れ直す</button></section>
    <div class="mini-letter" role="status" hidden>ミナ：小さな便、到着！<br>10枚を左から払い出します</div>`;
   host.append(this.root);this.story=this.root.querySelector('.story-window')!;this.drawWindow=this.root.querySelector('.draw-window')!;this.surface=this.root.querySelector('.draw-surface')!;
-  // Controls get their own row, rather than covering the characters' faces.
+  // Controls live outside the picture, rather than covering the characters.
   this.story.append(this.story.querySelector('.event-machine')!,this.story.querySelector('.mini-choice')!);
+  this.story.querySelector('.story-picture')!.prepend(this.root.querySelector('.dispatch-ledger')!);
   this.actors={} as Record<Character,HTMLElement>;
   for(const who of ['nagi','mina','garo'] as Character[]){const el=this.root.querySelector<HTMLElement>(`[data-who=${who}]`)!;this.actors[who]=el;el.querySelector<HTMLElement>('.paper-art')!.style.backgroundImage=`url("${asset(who)}")`;}
   this.bind(game);
@@ -61,7 +63,7 @@ export class Theater {
   this.host.closest('.stage')!.classList.toggle('event-expanded',this.ui.position==='center'||(physical&&!this.drawWindow.classList.contains('upper')));
   this.root.querySelector('[data-action=draw-move]')!.textContent=this.drawWindow.classList.contains('upper')?'大きく ↓':'小さく ↑';
   this.root.querySelector<HTMLButtonElement>('[data-action=skip]')!.hidden=!this.game.state.active&&this.ui.journal===null;
-  this.root.querySelector('[data-action=skip]')!.textContent=this.game.state.active?.physical&&!this.game.state.active.applied?'導入を省略':'演出を閉じる';
+  this.root.querySelector('[data-action=skip]')!.textContent=this.game.state.active?.physical&&!this.game.state.active.applied?'導入省略':'閉じる';
   this.root.querySelector<HTMLButtonElement>('[data-action=skip]')!.disabled=!!this.game.state.active?.physical&&!this.game.state.active.applied&&this.game.state.active.elapsed>=5.4;
   this.positionSpeech();
  }
@@ -82,10 +84,12 @@ export class Theater {
   // Layout coordinates do not rotate with the paper actor; its bubble stays still.
   const head={nagi:{normal:.08,surprise:.05,joy:.07,sad:.16},mina:{normal:.07,surprise:.06,joy:.12,sad:.13},garo:{normal:.07,surprise:.05,joy:.06,sad:.12}}[this.currentCut.who][this.currentCut.pose];
   const cast=actor.parentElement!;
+  speech.style.width=`${Math.min(300,w-12)}px`;speech.style.maxHeight=`${Math.max(20,picture.clientHeight-46)}px`;
+  speech.style.setProperty('--speech-text-height',`${Math.max(14,picture.clientHeight-54)}px`);
+  cast.style.top=`${Math.min(picture.clientHeight-20,speech.offsetHeight+30)}px`;
   const x=cast.offsetLeft+actor.offsetLeft+actor.offsetWidth/2,y=cast.offsetTop+actor.offsetTop+actor.offsetHeight*head;
-  speech.style.width=`${Math.min(260,w*.67)}px`;
   const left=Math.max(8,Math.min(w-speech.offsetWidth-8,x-speech.offsetWidth/2));
-  speech.style.left=`${left}px`;speech.style.top=`${Math.max(4,y-speech.offsetHeight-10)}px`;
+  speech.style.left=`${left}px`;speech.style.top=`${Math.max(22,y-speech.offsetHeight-10)}px`;
   speech.style.setProperty('--tail-x',`${Math.max(12,Math.min(speech.offsetWidth-12,x-left))}px`);
   speech.dataset.speaker=this.currentCut.who;
  }
@@ -168,9 +172,10 @@ export class Theater {
   choices.hidden=a?.kind!=='mini'||!!a.stampApplied;
   choices.querySelectorAll<HTMLButtonElement>('[data-route]').forEach((button,i)=>button.textContent=`${routes[i].name} ${this.game.state.deliveryStamps?.[i]??0}/3`);
   this.root.querySelector('.event-stage')!.textContent=a?progressPhase(a):this.ui.journal!==null?'配達日誌':'港の郵便局 · 待機中';
-  const ledger=this.root.querySelector('.dispatch-ledger')!;ledger.textContent=routes.map((r,i)=>`${r.name} ${'●'.repeat(this.game.state.deliveryStamps?.[i]??0)}${'○'.repeat(3-(this.game.state.deliveryStamps?.[i]??0))}`).join('　');
+  const ledger=this.root.querySelector('.dispatch-ledger')!;
   const kit=this.game.state.jpItems??{lights:0,charts:0,shields:0};
   this.root.querySelector('.jp-inventory')!.textContent=`次回準備 · 灯り ${kit.lights}/2 · 航海図 ${kit.charts}/1 · 補強 ${kit.shields}/1 · 再出航 ${this.game.state.jpFailures??0}/3`;
+  ledger.textContent=`灯 ${this.game.state.deliveryStamps?.[0]??0}/3 · 海 ${this.game.state.deliveryStamps?.[1]??0}/3 · 工 ${this.game.state.deliveryStamps?.[2]??0}/3\n光${kit.lights} · 図${kit.charts} · 盾${kit.shields} · 再出航${this.game.state.jpFailures??0}/3`;
   this.show(cut);
   if(this.flip){const f=this.flip;f.time+=dt;const t=Math.min(1,f.time/.55),angle=t*360;const actor=this.actors[f.who],art=actor.querySelector<HTMLElement>('.paper-art')!;
    actor.style.transform=`rotateY(${angle}deg)`;art.style.transform=Math.cos(t*Math.PI*2)<0?'rotateY(180deg)':'';
