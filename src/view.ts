@@ -159,7 +159,7 @@ export class BoardView {
     this.renderer.setSize(width,height);
     const board=this.boardRegion.getBoundingClientRect();
     const aspect=Math.max(1,board.width)/Math.max(1,board.height);
-    const visibleWidth=Math.max(17.4,26.5*aspect), visibleHeight=visibleWidth/aspect;
+    const visibleWidth=Math.max(16.2,26.5*aspect), visibleHeight=visibleWidth/aspect;
     this.camera.left=-visibleWidth/2;this.camera.right=visibleWidth/2;
     this.camera.top=visibleHeight/2;this.camera.bottom=-visibleHeight/2;this.camera.updateProjectionMatrix();
   }

@@ -41,7 +41,6 @@ app.innerHTML=`
   </main>
   <footer class="controls">
     <button type="button" id="refill-open" class="help-link refill-link" hidden>メダルを100枚追加</button>
-    <div class="supply-status" id="supply">手前から奥へ。狙いを決めて、メダルを投入。</div>
     <div class="control-row">
       <div class="feed-controls" role="group" aria-label="メダル投入モード">
         <button type="button" id="batch-mode" class="mode-button" aria-pressed="false" disabled><span>1プッシュ</span><strong id="batch-label">1枚</strong></button>
@@ -49,7 +48,7 @@ app.innerHTML=`
       </div>
       <button type="button" id="insert" class="insert" disabled>メダル投入<small>長押しで連続</small></button>
     </div>
-    <div class="bottom-note"><button type="button" class="help-link" id="help-open">遊び方</button><span>盤面をドラッグで向きを調整 <span id="angle-output">正面</span></span><span id="save-state" class="save-state">自動保存</span></div>
+    <div class="bottom-note"><button type="button" class="help-link" id="help-open">遊び方</button><span id="angle-output">正面</span><span class="supply-status" id="supply">盤面をドラッグで向きを調整</span><span id="save-state" class="save-state">自動保存</span></div>
   </footer>
   <dialog id="settings">
     <div class="dialog-header"><h2>設定</h2><button type="button" data-close>閉じる</button></div>

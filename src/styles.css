@@ -19,5 +19,22 @@ dialog{width:min(440px,calc(100% - 36px));max-height:calc(100dvh - 48px);overflo
 
 .feed-controls{flex:1;min-width:0;display:grid;grid-template-columns:1fr 1fr;gap:8px}.mode-button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;min-width:0;min-height:61px;padding:9px 4px;border:1px solid #82927a66;border-radius:4px;background:#22382e;color:#c5cbb9;box-shadow:inset 0 1px 0 #c8ceba0a}.mode-button span{font-size:10px;white-space:nowrap}.mode-button strong{font-weight:500;font-size:15px;line-height:1.2;font-variant-numeric:tabular-nums}.mode-button[aria-pressed=true]{background:#394a34;border-color:#b5a575;color:#ecdeb6}.mode-button:active{transform:translateY(1px)}#angle-output{display:inline-block;min-width:25px;color:#c4b68f;font-variant-numeric:tabular-nums}.bottom-note>span:nth-child(2){font-size:9px}@media(max-width:380px){.control-row{gap:12px}.controls{padding-left:16px;padding-right:16px}.insert{min-width:115px;padding-left:12px;padding-right:12px}.mode-button span{font-size:9px}.bottom-note{gap:4px}.bottom-note>span:nth-child(2){font-size:8px}}@media(max-height:620px){.mode-button{min-height:49px;padding-top:5px;padding-bottom:5px;gap:2px}}
 /* A full-width monitor above a separate, continuously running board. */
-.stage{display:grid;grid-template-rows:clamp(220px,38%,270px) minmax(0,1fr)}.stage.event-expanded{grid-template-rows:clamp(280px,50%,360px) minmax(0,1fr)}.render-layer{position:absolute;inset:0;pointer-events:none;z-index:0}.render-layer canvas{width:100%;height:100%}.event-dock{grid-row:1;position:relative;min-height:0;min-width:0;z-index:3;border-bottom:1px solid #bdc4ae33;overflow:hidden}.scene{grid-row:2;position:relative;inset:auto;min-height:0;overflow:hidden;z-index:1}
-@media(max-height:620px){.stage{grid-template-rows:min(42%,160px) minmax(0,1fr)}.stage.event-expanded{grid-template-rows:min(52%,200px) minmax(0,1fr)}}
+:root{--safe-top:env(safe-area-inset-top,0px);--safe-bottom:env(safe-area-inset-bottom,0px)}
+.stage{display:grid;grid-template-rows:clamp(76px,calc(11dvh - var(--safe-top)*.35 - var(--safe-bottom)*.35),100px) minmax(0,1fr)}.stage.event-expanded{grid-template-rows:clamp(82px,calc(13dvh - var(--safe-top)*.35 - var(--safe-bottom)*.35),116px) minmax(0,1fr)}.render-layer{position:absolute;inset:0;pointer-events:none;z-index:0}.render-layer canvas{width:100%;height:100%}.event-dock{grid-row:1;position:relative;min-height:0;min-width:0;z-index:3;border-bottom:1px solid #bdc4ae33;overflow:hidden}.scene{grid-row:2;position:relative;inset:auto;min-height:0;overflow:hidden;z-index:1}
+/* Give the board about 70–80% of the viewport, not just of the leftover stage. */
+#app{grid-template-rows:max(28px,calc(40px - var(--safe-top))) minmax(0,1fr) 60px;padding-top:var(--safe-top);padding-bottom:var(--safe-bottom)}
+.topbar{padding:3px 16px;gap:8px}.wordmark{font-size:23px}.identity small{font-size:9px}.wallet{gap:5px}.wallet strong{font-size:25px}.quiet-button{padding:7px 2px;font-size:11px}
+.controls{display:grid;grid-template-rows:44px 12px;gap:0;padding:2px 12px;background:#142722}
+.supply-status{flex:1;min-width:0;min-height:0;line-height:12px;font-size:8px;margin:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.control-row{gap:12px;min-height:0}.feed-controls{gap:6px}.mode-button{min-height:44px;height:44px;padding:3px;gap:1px}.mode-button span{font-size:9px}.mode-button strong{font-size:13px}
+.insert{min-height:44px;height:44px;min-width:118px;padding:4px 12px;font-size:12px}.insert small{margin-top:0;font-size:8px}
+.bottom-note{margin:0;font-size:8px;line-height:12px}.bottom-note .help-link{min-height:12px;font-size:9px;line-height:12px}.bottom-note>span:nth-child(2){font-size:8px}
+.progress-bar{top:5px;left:16px;right:16px}
+.controls .refill-link{position:absolute;right:12px;top:2px;z-index:2;width:118px;height:44px;min-height:44px;margin:0;padding:4px;background:#c2b285;color:#22362c}
+@media(max-height:650px){#app{grid-template-rows:max(28px,calc(32px - var(--safe-top))) minmax(0,1fr) 60px}.topbar{padding:1px 12px}.wallet strong{font-size:22px}}
+@media(orientation:landscape) and (max-height:600px){
+ #app{grid-template-columns:minmax(0,1fr) 122px;grid-template-rows:28px minmax(0,1fr)}
+ .topbar{grid-column:1/-1;grid-row:1}.stage{grid-column:1;grid-row:2}.controls{grid-column:2;grid-row:2;display:flex;flex-direction:column;padding:6px;gap:6px;border-left:1px solid #bdc4ae33}
+ .control-row{flex-direction:column;gap:10px;align-items:stretch}.feed-controls{flex:none;grid-template-columns:1fr}.insert{min-width:0;width:100%}.bottom-note{margin-top:auto;flex-direction:column;align-items:stretch;gap:5px;line-height:1.4}.bottom-note .supply-status{white-space:normal;line-height:1.4;min-height:26px}
+ .controls .refill-link{position:static;width:100%;height:auto;flex:0 0 44px}
+}
