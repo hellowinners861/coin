@@ -17,12 +17,15 @@ app.innerHTML=`
     <button type="button" class="quiet-button" id="settings-open">設定</button>
   </header>
   <main class="stage">
-    <div class="scene" id="scene"></div>
+    <div class="render-layer" id="render-layer" aria-hidden="true"></div>
+    <section class="event-dock" id="event-dock" aria-label="イベント専用モニター"></section>
+    <div class="scene" id="scene">
     <div class="progress-bar">
       <div class="progress-item">次の抽選まで <strong id="event-remaining">30枚</strong></div>
       <div class="progress-item">ボール <strong id="ball-count">0 / 3</strong><span class="ball-dots" aria-hidden="true"><i class="ball-dot"></i><i class="ball-dot"></i><i class="ball-dot"></i></span></div>
     </div>
     <div class="win-pop" id="win-pop" aria-hidden="true"></div>
+    </div>
     <div class="cover" id="cover">
       <div class="cover-content">
         <p class="eyebrow">coin</p><h1 id="cover-title">盤面を準備しています</h1>
@@ -68,7 +71,7 @@ app.innerHTML=`
   <dialog id="help">
     <div class="dialog-header"><h2>遊び方</h2><button type="button" data-close>閉じる</button></div>
     <ul><li>左下の「1プッシュ」で1枚／3枚を切り替えます。3枚は間隔をあけて順に投入し、手持ちも1枚ずつ使います。長押しで連続投入できます。</li><li>盤面を左右にドラッグして投入口の向きを調整します。</li><li>「自動投入」をONにすると、レールを進む時間を見込んで上段が一番手前へ出る頃を狙います。1枚／3枚の設定に従い、1往復につき1回投入します。獲得枚数を保証するものではありません。</li><li>自動投入はOFFボタンで停止。手持ち0枚で自動停止し、追加後はONにし直してください。再読込時もOFFで始まります。</li><li>手前へ落ちたメダルを獲得。横落ちはありません。</li><li>30枚獲得するごとにイベント。ボール3個の回収でジャックポット抽選です。</li><li>タワーは右奥の搬入口に空きができると登場します。土台のメダルを押して崩しましょう。</li><li>手持ちが0枚になると100枚を無料で追加できます。「落下を待つ」を選んだ後も、画面下の追加ボタンから受け取れます。</li></ul>
-    <h3>イベント画面</h3><p>港の郵便局の会話が上のモニターに流れます。イベント画面は上へスワイプ、または「上へ」で小さくできます。「中央へ」で戻せます。JP抽選では10個の穴へ球を転がし、入った穴で報酬が決まります。10枚の穴が7個、30枚が2個、JPが1個。配置は投球前に決まり、球が転がり出してから当たり穴を変更しません。抽選を上へ送った後は「盤面を再開」でプレイを続けられます。JPで配達日誌が開き、設定から読み返せます。</p><h3>報酬の受け取り方</h3><p>5枚・10枚・30枚・JP300枚の報酬は、上段が一番手前に来た時に左横の射出口から奥側へ払い出します。手前へ落とすと手持ちに加わります。水色のミニボールを落とすと10枚を払い出し、大きいボールのJP進行とは別です。</p>
+    <h3>イベント画面</h3><p>港の郵便局の会話が上のモニターに流れます。イベント画面は盤面の上の専用エリアに表示します。上へスワイプ、または「小さく」で縮小できます。「大きく」で戻せます。JP抽選では10個の穴へ球を転がし、入った穴で報酬が決まります。10枚の穴が7個、30枚が2個、JPが1個。配置は投球前に決まり、球が転がり出してから当たり穴を変更しません。抽選を上へ送った後は「盤面を再開」でプレイを続けられます。JPで配達日誌が開き、設定から読み返せます。</p><h3>報酬の受け取り方</h3><p>5枚・10枚・30枚・JP300枚の報酬は、上段が一番手前に来た時に左横の射出口から奥側へ払い出します。手前へ落とすと手持ちに加わります。水色のミニボールを落とすと10枚を払い出し、大きいボールのJP進行とは別です。</p>
     <details><summary>抽選の確率とボール追加</summary><p>通常イベント：報酬なし20%、5枚20%、10枚35%、ボール18%、タワー4%、JP抽選2%、JP直撃1%。JP抽選：10枚70%、盤面へ30枚20%、JP10%。メダル報酬はすべて盤面への払出しです。</p><p>手持ちから5枚投入するごとに20%で大きいボール追加。盤面の大きいボールは最大3個で、当選済みの追加報酬は空きができるまで保留されます。水色のミニボールは初期3個、投入10枚ごとに1個追加（盤面と追加待ち合わせて最大6個）。下段に供給され、1個落とすと10枚払出し。JP用の大きいボール3個には含めません。無料補充は続けるための手持ちとして追加します。</p></details>
     <p>PCでは左右キーで向きを調整し、スペースキーで投入できます。</p>
     <button type="button" class="primary resume" data-close>盤面へ戻る</button>
@@ -250,7 +253,7 @@ async function boot() {
       try {game=new Game(old.game);sim=new Simulation(game,old.physics);hasOldSave=true;}
       catch {invalidSave=true;game=new Game();sim=new Simulation(game);}
     } else {invalidSave=!!old;game=new Game();sim=new Simulation(game);}
-    view=new BoardView(scene,sim);feed=new MedalFeed(game,sim);theater=new Theater(document.querySelector<HTMLElement>('.stage')!,game);bindGame();theater.tick(0);ready=true;$<HTMLInputElement>('start-sound').disabled=false;lastWon=game.state.won;
+    view=new BoardView($('render-layer'),sim,scene);feed=new MedalFeed(game,sim);theater=new Theater($('event-dock'),game);bindGame();theater.tick(0);ready=true;$<HTMLInputElement>('start-sound').disabled=false;lastWon=game.state.won;
     $('loading').hidden=true;$('cover-title').textContent='メダルプッシャー';
     $('cover-copy').innerHTML='投入口を左右に振って、奥へ。<br>重なったメダルを、手前へ。';
     $('start').hidden=false;$('start').textContent=hasOldSave?'つづきから':'100枚で はじめる';

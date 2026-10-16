@@ -52,7 +52,7 @@ export class BoardView {
   private lastSize={width:0,height:0};
   private staticParts: THREE.Mesh[]=[];
   private renderLow=false;
-  constructor(public host: HTMLElement, public simulation: Simulation) {
+  constructor(public host: HTMLElement, public simulation: Simulation, public boardRegion:HTMLElement=host) {
     this.renderer=new THREE.WebGLRenderer({antialias:true,alpha:true,powerPreference:'high-performance'});
     this.renderer.setPixelRatio(Math.min(devicePixelRatio,1.8));
     this.renderer.outputColorSpace=THREE.SRGBColorSpace;
@@ -151,13 +151,14 @@ export class BoardView {
     this.miniBalls.castShadow=true;this.miniBalls.receiveShadow=true;
     this.miniBalls.frustumCulled=false;this.scene.add(this.miniBalls);
     this.camera.position.set(0,32,-15);this.camera.lookAt(0,1.7,8);
-    this.resizeObserver=new ResizeObserver(()=>this.resize());this.resizeObserver.observe(host);this.resize();
+    this.resizeObserver=new ResizeObserver(()=>this.resize());this.resizeObserver.observe(host);this.resizeObserver.observe(boardRegion);this.resize();
   }
   resize() {
     const {width,height}=this.host.getBoundingClientRect();if(!width||!height)return;
     this.lastSize={width,height};
     this.renderer.setSize(width,height);
-    const aspect=width/height;
+    const board=this.boardRegion.getBoundingClientRect();
+    const aspect=Math.max(1,board.width)/Math.max(1,board.height);
     const visibleWidth=Math.max(17.4,26.5*aspect), visibleHeight=visibleWidth/aspect;
     this.camera.left=-visibleWidth/2;this.camera.right=visibleWidth/2;
     this.camera.top=visibleHeight/2;this.camera.bottom=-visibleHeight/2;this.camera.updateProjectionMatrix();
@@ -194,6 +195,11 @@ export class BoardView {
     this.coins.count=coins;this.balls.count=this.cores.count=balls;
     this.miniBalls.count=minis;this.miniBalls.instanceMatrix.needsUpdate=true;
     this.coins.instanceMatrix.needsUpdate=true;this.balls.instanceMatrix.needsUpdate=true;this.cores.instanceMatrix.needsUpdate=true;
+    const canvas=this.host.getBoundingClientRect(),board=this.boardRegion.getBoundingClientRect();
+    this.renderer.setScissorTest(false);this.renderer.setViewport(0,0,canvas.width,canvas.height);this.renderer.clear(true,true,true);
+    this.renderer.setScissorTest(true);
+    this.renderer.setScissor(board.left-canvas.left,canvas.bottom-board.bottom,board.width,board.height);
+    this.renderer.setViewport(board.left-canvas.left,canvas.bottom-board.bottom,board.width,board.height);
     this.renderer.render(this.scene,this.camera);
     const overlay=this.overlay;
     if(overlay){
@@ -206,6 +212,7 @@ export class BoardView {
         this.renderer.setScissorTest(false);this.renderer.setViewport(0,0,h.width,h.height);
       }
     }
+    this.renderer.setScissorTest(false);this.renderer.setViewport(0,0,canvas.width,canvas.height);
   }
   dispose() {
     this.resizeObserver.disconnect();this.env.dispose();

@@ -14,11 +14,11 @@ export class Theater {
  constructor(public host:HTMLElement,public game:Game){
   this.root=document.createElement('div');this.root.className='theater';this.root.innerHTML=`
    <section class="story-window upper" aria-label="港の郵便局の物語">
-    <header class="movie-bar"><span class="movie-title">港の郵便局</span><div><button type="button" data-action="move">中央へ ↓</button><button type="button" data-action="skip" hidden>演出を閉じる</button></div></header>
+    <header class="movie-bar"><span class="movie-title">港の郵便局</span><div><button type="button" data-action="move">大きく ↓</button><button type="button" data-action="skip" hidden>演出を閉じる</button></div></header>
     <div class="story-picture"><div class="story-backdrop"></div><div class="cast" aria-hidden="true">${(['nagi','mina','garo'] as Character[]).map(w=>`<div class="paper-actor ${w}" data-who="${w}"><div class="paper-art"></div></div>`).join('')}</div><div class="speech" aria-live="polite"><b></b><span></span></div><div class="result-stamp" role="status"></div></div>
-    <div class="story-note">上にスワイプで盤面へ・下にスワイプで中央へ</div>
+    <div class="story-note">上にスワイプで縮小・下にスワイプで拡大</div>
    </section>
-   <section class="draw-window" aria-label="特別便のボール抽選" hidden><header class="movie-bar"><span>特別便のドック</span><button type="button" data-action="draw-move">上へ ↑</button></header><div class="draw-surface" role="img" aria-label="10個の穴と白い抽選球。球が入った穴の報酬を獲得"></div><div class="draw-note" aria-live="polite"></div><button type="button" class="retry-draw" hidden>球を入れ直す</button></section>
+   <section class="draw-window" aria-label="特別便のボール抽選" hidden><header class="movie-bar"><span>特別便のドック</span><button type="button" data-action="draw-move">小さく ↑</button></header><div class="draw-surface" role="img" aria-label="10個の穴と白い抽選球。球が入った穴の報酬を獲得"></div><div class="draw-note" aria-live="polite"></div><button type="button" class="retry-draw" hidden>球を入れ直す</button></section>
    <button type="button" class="resume-board" hidden>盤面を再開</button><div class="mini-letter" role="status" hidden>ミナ：小さな便、到着！<br>10枚を左から払い出します</div>`;
   host.append(this.root);this.story=this.root.querySelector('.story-window')!;this.drawWindow=this.root.querySelector('.draw-window')!;this.surface=this.root.querySelector('.draw-surface')!;
   this.actors={} as Record<Character,HTMLElement>;
@@ -36,6 +36,7 @@ export class Theater {
    win.addEventListener('pointerup',e=>{e.stopPropagation();if(!swiping)return;swiping=false;const dy=e.clientY-y;if(Math.abs(dy)<48||Math.abs(dy)<Math.abs(e.clientX-x)*1.35)return;if(win===this.story)this.move(dy<0?'upper':'center');else{this.drawWindow.classList.toggle('upper',dy<0);this.ui.position='upper';this.changed();}});
    win.addEventListener('pointercancel',()=>{swiping=false;});
   }
+  new ResizeObserver(()=>this.layout()).observe(host);
   for(const id of ['bg01','bg02','nagi','mina','garo']){const img=new Image();img.src=asset(id);}
  }
  bind(game:Game){this.drawView?.dispose();this.draw?.dispose();this.draw=undefined;this.drawView=undefined;this.game=game;game.cinematic=true;game.state.theater??={ticket:0,position:'upper',journal:null,journalTime:0};this.lastTicket=this.ui.ticket;this.previousMini=game.state.miniBallsCollected;this.lastCut='';this.drawWindow.classList.toggle('upper',!!this.ui.drawUpper);this.drawWindow.classList.toggle('resumed',!!this.ui.boardResumed);}
@@ -48,22 +49,18 @@ export class Theater {
   if(physical&&this.ui.position==='center')this.drawWindow.classList.add('upper');
   if(physical&&this.drawWindow.classList.contains('upper')&&this.ui.position==='upper')this.story.classList.add('compact');else this.story.classList.remove('compact');
   this.root.querySelector<HTMLElement>('.resume-board')!.hidden=!(physical&&this.drawWindow.classList.contains('upper')&&this.ui.position==='upper'&&!this.drawWindow.classList.contains('resumed'));
-  this.root.querySelector('[data-action=move]')!.textContent=this.ui.position==='center'?'上へ ↑':'中央へ ↓';
-  // Place a centered window in the space below its docked companion. On a
-  // short screen, fit the active window while preserving its aspect ratio.
-  this.story.style.top='';this.story.style.width='';this.drawWindow.style.top='';this.drawWindow.style.width='';
-  if(physical&&!this.drawWindow.classList.contains('upper')&&this.ui.position==='upper'){
-    const bottom=this.story.offsetTop+this.story.offsetHeight;
-    const available=Math.max(120,this.host.clientHeight-bottom-12);
-    this.drawWindow.style.width=`${Math.min(this.host.clientWidth*.92,660,Math.max(120,(available-90)*1.45))}px`;
-    this.drawWindow.style.top=`${(bottom+this.host.clientHeight)/2}px`;
-  }else if(physical&&this.ui.position==='center'){
-    const bottom=this.drawWindow.offsetTop+this.drawWindow.offsetHeight;
-    const available=Math.max(120,this.host.clientHeight-bottom-12);
-    this.story.style.width=`${Math.min(this.host.clientWidth*.92,660,Math.max(120,(available-70)*16/9))}px`;
-    this.story.style.top=`${(bottom+this.host.clientHeight)/2}px`;
-  }
-  this.root.querySelector('[data-action=draw-move]')!.textContent=this.drawWindow.classList.contains('upper')?'中央へ ↓':'上へ ↑';
+  this.root.querySelector('[data-action=move]')!.textContent=this.ui.position==='center'?'小さく ↑':'大きく ↓';
+  // Both windows live in a dedicated grid row above the board, in every mode.
+  this.host.closest('.stage')!.classList.toggle('event-expanded',this.ui.position==='center'||(physical&&!this.drawWindow.classList.contains('upper')));
+  const height=Math.max(48,this.host.clientHeight-16),width=Math.max(1,this.host.clientWidth-16);
+  const storyShare=physical?(this.ui.position==='center'?.65:this.drawWindow.classList.contains('upper')?.5:.35):1;
+  const available=physical?Math.max(1,width-8):width;
+  const storyWidth=Math.max(1,Math.min(available*storyShare,Math.max(1,height-44)*16/9));
+  const drawExtra=(this.drawWindow.classList.contains('upper')?44:84)+(this.root.querySelector<HTMLElement>('.retry-draw')!.hidden?0:44);
+  const drawWidth=Math.max(1,Math.min(available*(1-storyShare),Math.max(1,height-drawExtra)*1.45));
+  this.story.style.width=`${storyWidth}px`;this.story.style.height=`${storyWidth*9/16+44}px`;
+  this.drawWindow.style.width=`${drawWidth}px`;this.drawWindow.style.height=`${drawWidth/1.45+drawExtra}px`;
+  this.root.querySelector('[data-action=draw-move]')!.textContent=this.drawWindow.classList.contains('upper')?'大きく ↓':'小さく ↑';
   this.root.querySelector<HTMLButtonElement>('[data-action=skip]')!.hidden=!this.game.state.active&&this.ui.journal===null;
   this.root.querySelector('[data-action=skip]')!.textContent=this.game.state.active?.physical&&!this.game.state.active.applied?'導入を省略':'演出を閉じる';
   this.root.querySelector<HTMLButtonElement>('[data-action=skip]')!.disabled=!!this.game.state.active?.physical&&!this.game.state.active.applied&&this.game.state.active.elapsed>=5.4;
