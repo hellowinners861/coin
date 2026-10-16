@@ -10,19 +10,19 @@ const positions={normal:'0% 0%',surprise:'100% 0%',joy:'0% 100%',sad:'100% 100%'
 export class Theater {
  root:HTMLElement;story:HTMLElement;drawWindow:HTMLElement;surface:HTMLElement;
  private actors:Record<Character,HTMLElement>;private lastCut='';private time=0;private lastTicket=0;private draw?:PhysicalDraw;private drawView?:DrawView;private drawKey='';
- private flip?:{who:Character;time:number;cut:Cut;swapped:boolean};private previousMini=0;
+ private flip?:{who:Character;time:number;cut:Cut;swapped:boolean};private previousMini=0;private showStoryDuringDraw=false;
  private get ui(){return this.game.state.theater!;}
  constructor(public host:HTMLElement,public game:Game){
   this.root=document.createElement('div');this.root.className='theater';this.root.innerHTML=`
    <div class="dispatch-ledger" aria-label="配達スタンプ" title="同じ航路のスタンプ3個で追加チャレンジ"></div>
    <section class="story-window upper" aria-label="港の郵便局の物語">
-    <header class="movie-bar"><span class="movie-title">港の郵便局</span><div><button type="button" data-action="move">大きく ↓</button><button type="button" data-action="skip" hidden>演出を閉じる</button></div></header>
+    <header class="movie-bar"><span class="movie-title">港の郵便局</span><div><button type="button" data-action="watch-draw" hidden>抽選へ</button><button type="button" data-action="move">大きく ↓</button><button type="button" data-action="skip" hidden>演出を閉じる</button></div></header>
     <div class="event-stage" role="status"></div>
     <div class="story-picture"><div class="story-backdrop"></div><div class="cast" aria-hidden="true">${(['nagi','mina','garo'] as Character[]).map(w=>`<div class="paper-actor ${w}" data-who="${w}"><div class="paper-art"></div></div>`).join('')}</div><div class="speech" aria-live="polite"><b></b><span></span></div><div class="event-machine" hidden><div class="reel-strip" aria-label="抽選リール"><span></span><span></span><span></span></div><button type="button" data-action="advance" title="演出を早めます。当選率は変わりません。">停止・次へ</button></div><div class="mini-choice" hidden>${routes.map((r,i)=>`<button type="button" data-route="${i}">${r.name}</button>`).join('')}</div><div class="result-stamp" role="status"></div></div>
     <div class="story-note">上にスワイプで縮小・下にスワイプで拡大</div>
    </section>
-   <section class="draw-window" aria-label="特別便のボール抽選" hidden><header class="movie-bar"><span>特別便のドック</span><button type="button" data-action="draw-move">小さく ↑</button></header><div class="draw-surface" role="img" aria-label="10個の穴と白い抽選球。球が入った穴の報酬を獲得"></div><div class="draw-note" aria-live="polite"></div><button type="button" class="retry-draw" hidden>球を入れ直す</button></section>
-   <button type="button" class="resume-board" hidden>盤面を再開</button><div class="mini-letter" role="status" hidden>ミナ：小さな便、到着！<br>10枚を左から払い出します</div>`;
+   <section class="draw-window" aria-label="特別便のボール抽選" hidden><header class="movie-bar"><span>特別便のドック</span><div><button type="button" data-action="watch-story">物語へ</button><button type="button" data-action="draw-move">小さく ↑</button></div></header><div class="draw-surface" role="img" aria-label="10個の穴と白い抽選球。球が入った穴の報酬を獲得"></div><div class="draw-note" aria-live="polite"></div><button type="button" class="retry-draw" hidden>球を入れ直す</button></section>
+   <div class="mini-letter" role="status" hidden>ミナ：小さな便、到着！<br>10枚を左から払い出します</div>`;
   host.append(this.root);this.story=this.root.querySelector('.story-window')!;this.drawWindow=this.root.querySelector('.draw-window')!;this.surface=this.root.querySelector('.draw-surface')!;
   this.actors={} as Record<Character,HTMLElement>;
   for(const who of ['nagi','mina','garo'] as Character[]){const el=this.root.querySelector<HTMLElement>(`[data-who=${who}]`)!;this.actors[who]=el;el.querySelector<HTMLElement>('.paper-art')!.style.backgroundImage=`url("${asset(who)}")`;}
@@ -32,7 +32,7 @@ export class Theater {
   this.root.querySelector('[data-action=skip]')!.addEventListener('click',()=>{
    if(this.ui.journal!==null)this.finishJournal();else this.game.skip();this.changed();
   });
-  this.root.querySelector('.resume-board')!.addEventListener('click',()=>{this.root.querySelector('.resume-board')!.setAttribute('hidden','');this.drawWindow.classList.add('resumed');this.changed();});
+  for(const [action,story] of [['watch-story',true],['watch-draw',false]] as const)this.root.querySelector(`[data-action=${action}]`)!.addEventListener('click',()=>{this.showStoryDuringDraw=story;this.layout();});
   this.root.querySelector('[data-action=advance]')!.addEventListener('click',()=>{if(this.game.state.active)this.game.advancePresentation(this.game.state.active.id);});
   this.root.querySelectorAll<HTMLButtonElement>('[data-route]').forEach(button=>button.addEventListener('click',()=>{const a=this.game.state.active;if(a)this.game.chooseMiniRoute(a.id,Number(button.dataset.route));}));
   this.root.querySelector('.retry-draw')!.addEventListener('click',()=>this.retry());
@@ -44,28 +44,16 @@ export class Theater {
   new ResizeObserver(()=>this.layout()).observe(host);
   for(const id of ['bg01','bg02','nagi','mina','garo']){const img=new Image();img.src=asset(id);}
  }
- bind(game:Game){this.drawView?.dispose();this.draw?.dispose();this.draw=undefined;this.drawView=undefined;this.game=game;this.drawKey='';game.cinematic=true;game.state.theater??={ticket:0,position:'upper',journal:null,journalTime:0};this.lastTicket=this.ui.ticket;this.previousMini=game.state.miniBallsCollected;this.lastCut='';this.drawWindow.classList.toggle('upper',!!this.ui.drawUpper);this.drawWindow.classList.toggle('resumed',!!this.ui.boardResumed);}
- private changed(){this.ui.drawUpper=this.drawWindow.classList.contains('upper');this.ui.boardResumed=this.drawWindow.classList.contains('resumed');this.game.onDurableChange();this.layout();}
+ bind(game:Game){this.drawView?.dispose();this.draw?.dispose();this.draw=undefined;this.drawView=undefined;this.game=game;this.drawKey='';this.showStoryDuringDraw=false;game.cinematic=true;game.state.theater??={ticket:0,position:'upper',journal:null,journalTime:0};this.lastTicket=this.ui.ticket;this.previousMini=game.state.miniBallsCollected;this.lastCut='';this.drawWindow.classList.toggle('upper',!!this.ui.drawUpper);}
+ private changed(){this.ui.drawUpper=this.drawWindow.classList.contains('upper');delete this.ui.boardResumed;this.game.onDurableChange();this.layout();}
  private move(position:'center'|'upper'){this.ui.position=position;if(position==='center')this.drawWindow.classList.add('upper');this.changed();}
- get boardBlocked(){return (this.ui.position==='center'&&(!!this.game.state.active||this.ui.journal!==null))||(!this.drawWindow.hidden&&!this.drawWindow.classList.contains('upper'))||(!this.drawWindow.hidden&&this.drawWindow.classList.contains('upper')&&!this.drawWindow.classList.contains('resumed'));}
  private layout(){
   const physical=!!this.drawView;this.story.classList.toggle('upper',this.ui.position==='upper');
-  this.story.classList.toggle('has-draw',physical);this.drawWindow.hidden=!physical;
-  if(physical&&this.ui.position==='center')this.drawWindow.classList.add('upper');
-  if(physical&&this.drawWindow.classList.contains('upper')&&this.ui.position==='upper')this.story.classList.add('compact');else this.story.classList.remove('compact');
-  this.root.querySelector<HTMLElement>('.resume-board')!.hidden=!(physical&&this.drawWindow.classList.contains('upper')&&this.ui.position==='upper'&&!this.drawWindow.classList.contains('resumed'));
+  this.story.hidden=physical&&!this.showStoryDuringDraw;this.drawWindow.hidden=!physical||this.showStoryDuringDraw;
+  this.root.querySelector<HTMLElement>('[data-action=watch-draw]')!.hidden=!physical;
   this.root.querySelector('[data-action=move]')!.textContent=this.ui.position==='center'?'小さく ↑':'大きく ↓';
   // Both windows live in a dedicated grid row above the board, in every mode.
   this.host.closest('.stage')!.classList.toggle('event-expanded',this.ui.position==='center'||(physical&&!this.drawWindow.classList.contains('upper')));
-  const height=Math.max(48,this.host.clientHeight-40),width=Math.max(1,this.host.clientWidth-16);
-  const storyShare=physical?(this.ui.position==='center'?.65:this.drawWindow.classList.contains('upper')?.5:.35):1;
-  const available=physical?Math.max(1,width-8):width;
-  const storyExtra=this.ui.position==='upper'?44:70,storyAspect=this.ui.position==='upper'?2.6:16/9;
-  const storyWidth=Math.max(1,Math.min(available*storyShare,Math.max(1,height-storyExtra)*storyAspect));
-  const drawExtra=(this.drawWindow.classList.contains('upper')?44:84)+(this.root.querySelector<HTMLElement>('.retry-draw')!.hidden?0:44);
-  const drawWidth=Math.max(1,Math.min(available*(1-storyShare),Math.max(1,height-drawExtra)*1.45));
-  this.story.style.width=`${storyWidth}px`;this.story.style.height=`${storyWidth/storyAspect+storyExtra}px`;
-  this.drawWindow.style.width=`${drawWidth}px`;this.drawWindow.style.height=`${drawWidth/1.45+drawExtra}px`;
   this.root.querySelector('[data-action=draw-move]')!.textContent=this.drawWindow.classList.contains('upper')?'大きく ↓':'小さく ↑';
   this.root.querySelector<HTMLButtonElement>('[data-action=skip]')!.hidden=!this.game.state.active&&this.ui.journal===null;
   this.root.querySelector('[data-action=skip]')!.textContent=this.game.state.active?.physical&&!this.game.state.active.applied?'導入を省略':'演出を閉じる';
@@ -82,7 +70,7 @@ export class Theater {
  }
  private finishJournal(){const chapter=this.ui.journal;if(chapter!==null)this.game.state.diaryRead=Math.max(this.game.state.diaryRead??0,chapter+1);this.ui.journal=null;this.ui.journalTime=0;this.ui.position='upper';this.changed();}
  replay(chapter:number){if(this.game.state.active||chapter>=(this.game.state.diaryUnlocked??0))return;this.ui.journal=chapter;this.ui.journalTime=0;this.ui.position='center';this.changed();}
- private clearDraw(){this.drawView?.dispose();this.draw?.dispose();this.drawView=undefined;this.draw=undefined;this.drawKey='';}
+ private clearDraw(){this.drawView?.dispose();this.draw?.dispose();this.drawView=undefined;this.draw=undefined;this.drawKey='';this.showStoryDuringDraw=false;}
  capture(){const a=this.game.state.active;if(!this.draw||!a||!this.drawKey.startsWith(`${a.id}:`))return;if(this.drawKey.endsWith(':route')&&a.qualifier)a.qualifier.drawSave=this.draw.export();else a.drawSave=this.draw.export();}
  private retry(){const a=this.game.state.active;if(!a||a.applied||!this.draw)return;const retry=this.draw.retry+1,mode=this.drawView!.mode,plan=mode==='route'?a.qualifier!.plan:{...a.plan!,seed:(a.plan!.seed+Math.imul(a.route??0,2654435761))>>>0};this.clearDraw();this.drawKey=`${a.id}:${mode==='route'?'route':'prize'}`;this.draw=new PhysicalDraw({...plan,seed:(plan.seed+Math.imul(retry,2654435761))>>>0});this.draw.retry=retry;this.drawView=new DrawView(this.draw,mode);if(mode==='route'&&a.qualifier)delete a.qualifier.drawSave;else delete a.drawSave;this.changed();}
  private tickDraw(a:Ticket,dt:number){
@@ -91,7 +79,7 @@ export class Theater {
    if(this.drawKey!==key){const previous=!!this.draw;this.clearDraw();this.drawKey=key;
      const plan=qualifying?q!.plan:{...a.plan,seed:(a.plan.seed+Math.imul(a.route??0,2654435761))>>>0},saved=qualifying?q!.drawSave:a.drawSave;
      this.draw=new PhysicalDraw(plan,saved);this.drawView=new DrawView(this.draw,qualifying?'route':'prize');
-     if(!previous&&!saved){this.ui.position='upper';this.drawWindow.classList.remove('upper','resumed');}this.changed();
+     if(!previous&&!saved){this.ui.position='upper';this.drawWindow.classList.remove('upper');}this.changed();
    }
    if(!a.applied&&(!qualifying||q!.pocket===undefined)){this.draw!.step(dt);if(this.draw!.pocket!==null){if(qualifying)this.game.completeQualifier(a.id,this.draw!.pocket);else this.game.resolveDraw(a.id,this.draw!.result!);}}
    this.drawView!.update();
@@ -102,9 +90,9 @@ export class Theater {
  }
  tick(dt:number){
   this.time+=dt;const a=this.game.state.active;
-  if(a&&a.id!==this.lastTicket){this.clearDraw();this.lastTicket=this.ui.ticket=a.id;this.ui.position='center';this.story.classList.remove('arriving');void this.story.offsetWidth;this.story.classList.add('arriving');this.drawWindow.classList.remove('upper','resumed');this.lastCut='';this.changed();}
+  if(a&&a.id!==this.lastTicket){this.clearDraw();this.lastTicket=this.ui.ticket=a.id;this.ui.position='center';this.story.classList.remove('arriving');void this.story.offsetWidth;this.story.classList.add('arriving');this.drawWindow.classList.remove('upper');this.lastCut='';this.changed();}
   if(!a&&this.lastTicket&&this.ui.journal===null){this.ui.position='upper';this.lastTicket=this.ui.ticket=0;}
-  if(!a&&this.draw){this.clearDraw();this.drawWindow.hidden=true;this.drawWindow.classList.remove('upper','resumed');}
+  if(!a&&this.draw){this.clearDraw();this.drawWindow.hidden=true;this.drawWindow.classList.remove('upper');}
   if(!a&&this.ui.journal===null&&(this.game.state.diaryUnlocked??0)>(this.game.state.diaryRead??0)){this.ui.journal=this.game.state.diaryRead??0;this.ui.journalTime=0;this.ui.position='center';this.changed();}
   let cut:Cut;const stamp=this.story.querySelector<HTMLElement>('.result-stamp')!;stamp.hidden=true;
   if(this.ui.journal!==null){
