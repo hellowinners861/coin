@@ -1,3 +1,4 @@
+import { makePlan, type DrawPlan, type DrawSnapshot } from './events/draw';
 import { JPC, MINI_BALL_LIMIT, NORMAL, RESULT_LABELS, type Result } from './config';
 
 export class Random {
@@ -15,10 +16,11 @@ export function draw(rng: Random, table: readonly [Result, number][]): Result {
   for (const [value, weight] of table) { roll -= weight; if (roll < 0) return value; }
   throw new Error('Invalid probability table');
 }
-export type Ticket = { id: number; kind: 'normal' | 'jpc'; result?: Result; elapsed: number; applied: boolean };
+export type Ticket = { id: number; kind: 'normal' | 'jpc'; result?: Result; elapsed: number; applied: boolean; physical?: boolean; plan?: DrawPlan; drawSave?: DrawSnapshot; resolvedAt?: number };
 export type Payout = { id: number; remaining: number; total: number };
 export type FeedQueue = { remaining: number; nextAt: number; automatic: boolean; deadline: number | null };
 export type GameState = {
+  diaryUnlocked?: number; diaryRead?: number; theater?: { ticket: number; position: 'center'|'upper'; drawUpper?: boolean; boardResumed?:boolean; journal: number|null; journalTime: number };
   wallet: number; won: number; paid: number; direct: number; gauge: number; balls: number;
   inputRemainder: number; ballJobs: number; towerJobs: number; jackpots: number;
   miniBallJobs: number; miniBallsCollected: number;
@@ -27,6 +29,7 @@ export type GameState = {
   batchSize: 1 | 3; feedQueue: FeedQueue | null; feedReadyAt: number;
 };
 export class Game {
+  cinematic=false;
   state: GameState;
   random: Random[];
   onChange: () => void = () => {};
@@ -100,7 +103,7 @@ export class Game {
       case 'TOWER_STANDARD': s.towerJobs++; break;
       case 'JPC_ENTRY': this.enqueue('jpc'); break;
       case 'FIELD_30': this.payout(30); break;
-      case 'JACKPOT': case 'JACKPOT_DIRECT': s.jackpots++; this.payout(300); break;
+      case 'JACKPOT': case 'JACKPOT_DIRECT': s.jackpots++; s.diaryUnlocked=Math.min(3,(s.diaryUnlocked??0)+1); this.payout(300); break;
     }
     this.onSound(ticket.result.includes('JACKPOT') ? 'jackpot' : 'event');
   }
@@ -109,23 +112,32 @@ export class Game {
   }
   tick(dt: number) {
     const s = this.state;
+    if(this.cinematic&&s.theater?.journal!==null&&s.theater?.journal!==undefined)return;
     if (!s.active && s.queue.length) {
       const ticket = s.queue.shift()!;
-      ticket.result = draw(this.random[ticket.kind === 'normal' ? 0 : 2], ticket.kind === 'normal' ? NORMAL : JPC);
+      if(this.cinematic&&ticket.kind==='jpc'){ticket.physical=true;ticket.plan=makePlan(()=>this.random[2].next());}
+      else ticket.result = draw(this.random[ticket.kind === 'normal' ? 0 : 2], ticket.kind === 'normal' ? NORMAL : JPC);
       s.active = ticket;
       this.onDurableChange(); this.onChange();
     }
     const a = s.active;
     if (!a) return;
     a.elapsed += dt;
-    const reveal = a.kind === 'normal' ? 1.0 : 2.0;
+    if(a.physical){if(a.applied&&a.elapsed>(a.resolvedAt??a.elapsed)+5){s.active=null;this.onDurableChange();}return;}
+    const reveal = this.cinematic ? 5.4 : a.kind === 'normal' ? 1.0 : 2.0;
     if (a.elapsed >= reveal && !a.applied) {
       this.apply(a); this.onDurableChange(); this.onChange();
     }
-    if (a.elapsed > reveal + 2.4) { s.active = null; this.onDurableChange(); this.onChange(); }
+    if (a.elapsed > reveal + (this.cinematic ? 4.8 : 2.4)) { s.active = null; this.onDurableChange(); this.onChange(); }
+  }
+  resolveDraw(id:number,result:Result){
+    const a=this.state.active;
+    if(!a||a.id!==id||!a.physical||a.applied||!['CREDIT_10','FIELD_30','JACKPOT'].includes(result))return false;
+    a.result=result;a.resolvedAt=a.elapsed;this.apply(a);this.onDurableChange();this.onChange();return true;
   }
   skip() {
     if (!this.state.active) return;
+    if(this.state.active.physical&&!this.state.active.applied){this.state.active.elapsed=Math.max(5.4,this.state.active.elapsed);return;}
     this.apply(this.state.active);
     this.state.active = null;
     this.onDurableChange(); this.onChange();

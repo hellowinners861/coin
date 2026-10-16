@@ -7,6 +7,7 @@ import { BoardView } from './view';
 import { SaveStore, type SavedGame } from './storage';
 import { MachineAudio } from './audio';
 import './styles.css';
+import { Theater } from './events/theater';
 
 const app=document.getElementById('app')!;
 app.innerHTML=`
@@ -21,10 +22,6 @@ app.innerHTML=`
       <div class="progress-item">次の抽選まで <strong id="event-remaining">30枚</strong></div>
       <div class="progress-item">ボール <strong id="ball-count">0 / 3</strong><span class="ball-dots" aria-hidden="true"><i class="ball-dot"></i><i class="ball-dot"></i><i class="ball-dot"></i></span></div>
     </div>
-    <section class="event-panel" id="event" hidden aria-live="polite">
-      <div class="event-eyebrow"><span id="event-kind">チャンス抽選</span><button type="button" id="skip">スキップ</button></div>
-      <h2 id="event-title"></h2><p id="event-detail"></p>
-    </section>
     <div class="win-pop" id="win-pop" aria-hidden="true"></div>
     <div class="cover" id="cover">
       <div class="cover-content">
@@ -59,7 +56,7 @@ app.innerHTML=`
     <label class="setting">描画品質<select id="quality"><option value="high">標準</option><option value="low">軽量</option></select></label>
     <div class="stats"><span>獲得メダル<strong id="stat-won">0</strong></span><span>投入メダル<strong id="stat-paid">0</strong></span><span>JP回数<strong id="stat-jp">0</strong></span></div>
     <p id="storage-note" class="notice">盤面と抽選結果はこのブラウザに保存されます。</p>
-    <button type="button" class="secondary" id="reset-open">はじめから遊ぶ</button>
+    <div id="diary-list" class="diary-list"></div><button type="button" class="secondary" id="reset-open">はじめから遊ぶ</button>
     <div id="reset-prompt" class="reset-prompt" hidden><p>現在の盤面を終了し、手持ち100枚から始めます。</p><div class="reset-actions"><button type="button" class="secondary" id="reset-cancel">キャンセル</button><button type="button" class="primary" id="reset-confirm">はじめから</button></div></div>
     <button type="button" class="primary resume" data-close>盤面へ戻る</button>
   </dialog>
@@ -71,7 +68,7 @@ app.innerHTML=`
   <dialog id="help">
     <div class="dialog-header"><h2>遊び方</h2><button type="button" data-close>閉じる</button></div>
     <ul><li>左下の「1プッシュ」で1枚／3枚を切り替えます。3枚は間隔をあけて順に投入し、手持ちも1枚ずつ使います。長押しで連続投入できます。</li><li>盤面を左右にドラッグして投入口の向きを調整します。</li><li>「自動投入」をONにすると、レールを進む時間を見込んで上段が一番手前へ出る頃を狙います。1枚／3枚の設定に従い、1往復につき1回投入します。獲得枚数を保証するものではありません。</li><li>自動投入はOFFボタンで停止。手持ち0枚で自動停止し、追加後はONにし直してください。再読込時もOFFで始まります。</li><li>手前へ落ちたメダルを獲得。横落ちはありません。</li><li>30枚獲得するごとにイベント。ボール3個の回収でジャックポット抽選です。</li><li>タワーは右奥の搬入口に空きができると登場します。土台のメダルを押して崩しましょう。</li><li>手持ちが0枚になると100枚を無料で追加できます。「落下を待つ」を選んだ後も、画面下の追加ボタンから受け取れます。</li></ul>
-    <h3>報酬の受け取り方</h3><p>5枚・10枚・30枚・JP300枚の報酬は、上段が一番手前に来た時に左横の射出口から奥側へ払い出します。手前へ落とすと手持ちに加わります。水色のミニボールを落とすと10枚を払い出し、大きいボールのJP進行とは別です。</p>
+    <h3>イベント画面</h3><p>港の郵便局の会話が上のモニターに流れます。イベント画面は上へスワイプ、または「上へ」で小さくできます。「中央へ」で戻せます。JP抽選では10個の穴へ球を転がし、入った穴で報酬が決まります。10枚の穴が7個、30枚が2個、JPが1個。配置は投球前に決まり、球が転がり出してから当たり穴を変更しません。抽選を上へ送った後は「盤面を再開」でプレイを続けられます。JPで配達日誌が開き、設定から読み返せます。</p><h3>報酬の受け取り方</h3><p>5枚・10枚・30枚・JP300枚の報酬は、上段が一番手前に来た時に左横の射出口から奥側へ払い出します。手前へ落とすと手持ちに加わります。水色のミニボールを落とすと10枚を払い出し、大きいボールのJP進行とは別です。</p>
     <details><summary>抽選の確率とボール追加</summary><p>通常イベント：報酬なし20%、5枚20%、10枚35%、ボール18%、タワー4%、JP抽選2%、JP直撃1%。JP抽選：10枚70%、盤面へ30枚20%、JP10%。メダル報酬はすべて盤面への払出しです。</p><p>手持ちから5枚投入するごとに20%で大きいボール追加。盤面の大きいボールは最大3個で、当選済みの追加報酬は空きができるまで保留されます。水色のミニボールは初期3個、投入10枚ごとに1個追加（盤面と追加待ち合わせて最大6個）。下段に供給され、1個落とすと10枚払出し。JP用の大きいボール3個には含めません。無料補充は続けるための手持ちとして追加します。</p></details>
     <p>PCでは左右キーで向きを調整し、スペースキーで投入できます。</p>
     <button type="button" class="primary resume" data-close>盤面へ戻る</button>
@@ -81,17 +78,17 @@ const $=<T extends HTMLElement=HTMLElement>(id:string)=>document.getElementById(
 const scene=$('scene'),cover=$('cover'),insert=$<HTMLButtonElement>('insert');
 const settings=$<HTMLDialogElement>('settings'),help=$<HTMLDialogElement>('help'),refill=$<HTMLDialogElement>('refill');
 const audio=new MachineAudio(),store=new SaveStore();
-let game:Game,sim:Simulation,view:BoardView,feed:MedalFeed;
+let game:Game,sim:Simulation,view:BoardView,feed:MedalFeed,theater:Theater;
 let ready=false,paused=true,storageAvailable=false,saveWanted=false,saving=false;
-let lastSave=0,holding=false,lastInput=-10,drag:number|null=null,dragX=0,dragAngle=0;
+let lastSave=0,lastSaveClock=0,holding=false,lastInput=-10,drag:number|null=null,dragX=0,dragAngle=0;
 let lastFrame=0,accumulator=0,lastDraw=0,lastUI=0,lastWon=0,winUntil=0,winBatch=0;
-let hasOldSave=false,saveIssue='',lastEventKey='',refillAsked=false;
+let hasOldSave=false,saveIssue='',refillAsked=false;
 const debug=new URLSearchParams(location.search).has('debug');
 let fpsFrames=0,fpsTime=0,fps=0,physicsMs=0;
 
 function release() {holding=false;insert.classList.remove('pressed');}
 function requestInput() {
-  if(!ready||paused||feed.automatic)return;
+  if(!ready||paused||theater.boardBlocked||feed.automatic)return;
   audio.unlock();if(feed.requestManual()){lastInput=sim.time;saveWanted=true;}
 }
 function vibrate(pattern:number|number[]) {if(game?.state.vibration&&navigator.vibrate)navigator.vibrate(pattern);}
@@ -109,10 +106,11 @@ function bindGame() {
 }
 async function save(force=false) {
   if(!ready||!storageAvailable||saving||hasOldSave||sim.anomaly)return;
-  if(!force&&!saveWanted&&sim.time-lastSave<4)return;
+  if(!force&&!saveWanted&&sim.time-lastSave<4&&performance.now()-lastSaveClock<4000)return;
   saving=true;saveWanted=false;
+  theater.capture();
   const value:SavedGame={version:SAVE_VERSION,engine:ENGINE_VERSION,savedAt:Date.now(),game:game.export(),physics:sim.export()};
-  try {await store.save(value);lastSave=sim.time;saveIssue='';}
+  try {await store.save(value);lastSave=sim.time;lastSaveClock=performance.now();saveIssue='';}
   catch {saveIssue='保存できません';$('storage-note').textContent='このブラウザに保存できませんでした。空き容量や保存の設定を確認してください。';}
   finally {saving=false;}
 }
@@ -129,7 +127,7 @@ async function reset() {
   pause();
   const preferences={bgm:game.state.bgm,muted:game.state.muted,vibration:game.state.vibration,quality:game.state.quality,batchSize:game.state.batchSize};
   sim.dispose();game=new Game();Object.assign(game.state,preferences);sim=new Simulation(game);
-  view.simulation=sim;feed=new MedalFeed(game,sim);bindGame();refillAsked=false;lastWon=winBatch=0;lastEventKey='';lastInput=-10;
+  view.simulation=sim;feed=new MedalFeed(game,sim);theater.bind(game);bindGame();refillAsked=false;lastWon=winBatch=0;lastInput=-10;
   hasOldSave=false;sim.anomaly='';$('reset-prompt').hidden=true;
   if(settings.open)settings.close();
   cover.hidden=true;audio.unlock();audio.setPlaying(true);paused=false;lastFrame=performance.now();saveWanted=true;await save(true);updateUI();
@@ -152,10 +150,10 @@ function updateUI() {
   $('batch-mode').setAttribute('aria-pressed',String(s.batchSize===3));
   $('auto-mode').setAttribute('aria-pressed',String(feed.automatic));
   $('auto-label').textContent=feed.automatic?'ON':'OFF';
-  $<HTMLButtonElement>('batch-mode').disabled=paused;
-  $<HTMLButtonElement>('auto-mode').disabled=paused||s.wallet===0;
+  $<HTMLButtonElement>('batch-mode').disabled=paused||theater.boardBlocked;
+  $<HTMLButtonElement>('auto-mode').disabled=paused||theater.boardBlocked||s.wallet===0;
   insert.innerHTML=feed.automatic?'自動投入中<small>左のボタンでOFF</small>':`メダル投入<small>1プッシュ ${s.batchSize}枚</small>`;
-  insert.disabled=paused||s.wallet===0||feed.automatic;
+  insert.disabled=paused||theater.boardBlocked||s.wallet===0||feed.automatic;
   if(s.wallet===0)release();
   const payout=s.payouts.reduce((n,p)=>n+p.remaining,0);
   const supply:string[]=[];
@@ -172,15 +170,12 @@ function updateUI() {
   $('supply').textContent=supply.join(' ／ ')||(s.wallet===0?'落下を待つか、100枚追加して続けられます。':'手前へ落ちたメダルを獲得。ボール3個でJP抽選。');
   $('stat-won').textContent=s.won.toLocaleString('ja-JP');$('stat-paid').textContent=s.paid.toLocaleString('ja-JP');$('stat-jp').textContent=String(s.jackpots);
   $('save-state').textContent=saveIssue||(saving?'保存中…':storageAvailable?'自動保存':'保存を利用できません');
-  const active=s.active,label=game.activeLabel(),panel=$('event');
-  panel.hidden=!active;
-  const key=active?`${active.id}:${active.applied}`:'';
-  if(key!==lastEventKey&&label) {
-    lastEventKey=key;$('event-kind').textContent=active?.kind==='jpc'?'ジャックポット抽選':'チャンス抽選';
-    $('event-title').textContent=label.title;$('event-detail').textContent=label.detail;
-    panel.classList.toggle('drawing',label.revealing);panel.classList.toggle('jackpot',label.title==='JACKPOT');
+  const diary=$('diary-list');
+  if(diary.childElementCount!==(s.diaryUnlocked??0)){
+    diary.replaceChildren();
+    for(let i=0;i<(s.diaryUnlocked??0);i++){const button=document.createElement('button');button.type='button';button.className='secondary';button.textContent=`配達日誌 ${i+1} を読む`;button.addEventListener('click',()=>{settings.close();theater.replay(i);});diary.append(button);}
   }
-  if(!active)lastEventKey='';
+  diary.querySelectorAll('button').forEach(button=>button.disabled=!!s.active);
   if(s.won>lastWon) {winBatch+=s.won-lastWon;winUntil=performance.now()+1100;lastWon=s.won;$('win-pop').textContent=`+${winBatch}`;}
   if(performance.now()>winUntil)winBatch=0;
   $('win-pop').classList.toggle('visible',performance.now()<winUntil);
@@ -200,17 +195,17 @@ insert.addEventListener('contextmenu',e=>e.preventDefault());
 // Assistive technology and keyboard-generated button clicks have no pointerdown.
 insert.addEventListener('click',e=>{if(e.detail===0)requestInput();});
 $('batch-mode').addEventListener('click',()=>{
-  if(!ready||paused)return;release();game.state.batchSize=game.state.batchSize===1?3:1;
+  if(!ready||paused||theater.boardBlocked)return;release();game.state.batchSize=game.state.batchSize===1?3:1;
   saveWanted=true;void save(true);updateUI();
 });
 $('auto-mode').addEventListener('click',()=>{
-  if(!ready||paused)return;release();audio.unlock();feed.setAutomatic(!feed.automatic);updateUI();
+  if(!ready||paused||theater.boardBlocked)return;release();audio.unlock();feed.setAutomatic(!feed.automatic);updateUI();
 });
-scene.addEventListener('pointerdown',e=>{if(!ready||paused)return;scene.setPointerCapture(e.pointerId);drag=e.pointerId;dragX=e.clientX;dragAngle=sim.targetAngle;});
+scene.addEventListener('pointerdown',e=>{if(!ready||paused||theater.boardBlocked)return;scene.setPointerCapture(e.pointerId);drag=e.pointerId;dragX=e.clientX;dragAngle=sim.targetAngle;});
 scene.addEventListener('pointermove',e=>{if(e.pointerId!==drag)return;sim.setAngle(dragAngle+(e.clientX-dragX)/scene.clientWidth*LIMIT*2.5);});
 for(const type of ['pointerup','pointercancel','lostpointercapture'])scene.addEventListener(type,()=>{drag=null;});
 window.addEventListener('keydown',e=>{
-  if(!ready||paused||e.target instanceof HTMLInputElement||e.target instanceof HTMLSelectElement||e.target instanceof HTMLButtonElement)return;
+  if(!ready||paused||theater.boardBlocked||e.target instanceof HTMLInputElement||e.target instanceof HTMLSelectElement||e.target instanceof HTMLButtonElement)return;
   if(e.code==='Space'){e.preventDefault();if(!e.repeat){holding=true;requestInput();insert.classList.add('pressed');}}
   else if(e.code==='ArrowLeft'||e.code==='ArrowRight'){e.preventDefault();sim.setAngle(sim.targetAngle+(e.code==='ArrowRight'?1:-1)*Math.PI/180);}
   else if(e.code==='Escape')openDialog(settings);
@@ -235,7 +230,7 @@ $('quality').addEventListener('change',()=>{game.state.quality=$<HTMLSelectEleme
 $('reset-open').addEventListener('click',()=>{$('reset-prompt').hidden=false;});
 $('reset-cancel').addEventListener('click',()=>{$('reset-prompt').hidden=true;});
 $('reset-confirm').addEventListener('click',()=>{void reset();});
-$('skip').addEventListener('click',()=>game.skip());$('start').addEventListener('click',resume);
+$('start').addEventListener('click',resume);
 $('start-new').addEventListener('click',()=>openDialog(settings));
 document.addEventListener('visibilitychange',()=>{
   if(document.hidden) {pause();void audio.context?.suspend();if(ready&&cover.hidden&&!settings.open&&!help.open&&!refill.open){cover.hidden=false;$('cover-title').textContent='一時停止';$('cover-copy').textContent='盤面の動きを止めています。続きから遊べます。';$('start').hidden=false;$('start').textContent='つづける';}}
@@ -254,7 +249,7 @@ async function boot() {
       try {game=new Game(old.game);sim=new Simulation(game,old.physics);hasOldSave=true;}
       catch {invalidSave=true;game=new Game();sim=new Simulation(game);}
     } else {invalidSave=!!old;game=new Game();sim=new Simulation(game);}
-    view=new BoardView(scene,sim);feed=new MedalFeed(game,sim);bindGame();ready=true;$<HTMLInputElement>('start-sound').disabled=false;lastWon=game.state.won;
+    view=new BoardView(scene,sim);feed=new MedalFeed(game,sim);theater=new Theater(document.querySelector<HTMLElement>('.stage')!,game);bindGame();theater.tick(0);ready=true;$<HTMLInputElement>('start-sound').disabled=false;lastWon=game.state.won;
     $('loading').hidden=true;$('cover-title').textContent='メダルプッシャー';
     $('cover-copy').innerHTML='投入口を左右に振って、奥へ。<br>重なったメダルを、手前へ。';
     $('start').hidden=false;$('start').textContent=hasOldSave?'つづきから':'100枚で はじめる';
@@ -275,17 +270,19 @@ function frame(now:number) {
   requestAnimationFrame(frame);
   const elapsed=Math.min((now-lastFrame)/1000,.10);lastFrame=now;
   if(!paused&&!document.hidden) {
-    accumulator+=elapsed;
+    game.tick(elapsed);theater.tick(elapsed);
+    if(theater.boardBlocked){accumulator=0;release();}else accumulator+=elapsed;
     let steps=0;const start=performance.now();
     while(accumulator>=DT&&steps<10) {
       if(holding&&sim.time-lastInput>=(game.state.batchSize===3?.8:1/3))requestInput();
-      feed.tick();sim.step();accumulator-=DT;steps++;
+      feed.tick();sim.step(false);accumulator-=DT;steps++;
       if(sim.anomaly){pause();cover.hidden=false;$('cover-title').textContent='盤面を一時停止しました';$('cover-copy').textContent=sim.anomaly;$('start').hidden=true;$('start-new').hidden=false;break;}
     }
     if(steps)physicsMs=(performance.now()-start)/steps;
     if(steps===10)accumulator=Math.min(accumulator,DT);
-    if(saveWanted||sim.time-lastSave>=4)void save();
+    if(saveWanted||sim.time-lastSave>=4||now-lastSaveClock>=4000)void save();
   }
+  view.overlay=theater.overlay;
   audio.update();
   const interval=game.state.quality==='low'?1000/30:0;
   if(now-lastDraw>=interval) {view.render(paused?1:Math.min(accumulator/DT,1));lastDraw=now;fpsFrames++;}

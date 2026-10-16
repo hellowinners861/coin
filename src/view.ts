@@ -36,6 +36,7 @@ function coinMap() {
   return map;
 }
 export class BoardView {
+  overlay?: {scene:THREE.Scene;camera:THREE.PerspectiveCamera;element:HTMLElement};
   renderer: THREE.WebGLRenderer;
   scene = new THREE.Scene();
   camera = new THREE.OrthographicCamera(-10,10,14,-14,.1,150);
@@ -194,6 +195,17 @@ export class BoardView {
     this.miniBalls.count=minis;this.miniBalls.instanceMatrix.needsUpdate=true;
     this.coins.instanceMatrix.needsUpdate=true;this.balls.instanceMatrix.needsUpdate=true;this.cores.instanceMatrix.needsUpdate=true;
     this.renderer.render(this.scene,this.camera);
+    const overlay=this.overlay;
+    if(overlay){
+      const r=overlay.element.getBoundingClientRect(),h=this.host.getBoundingClientRect();
+      if(r.width>0&&r.height>0){
+        overlay.camera.aspect=r.width/r.height;overlay.camera.updateProjectionMatrix();
+        this.renderer.setScissorTest(true);this.renderer.setScissor(r.left-h.left,h.bottom-r.bottom,r.width,r.height);
+        this.renderer.setViewport(r.left-h.left,h.bottom-r.bottom,r.width,r.height);
+        this.renderer.clear(true,true,true);this.renderer.render(overlay.scene,overlay.camera);
+        this.renderer.setScissorTest(false);this.renderer.setViewport(0,0,h.width,h.height);
+      }
+    }
   }
   dispose() {
     this.resizeObserver.disconnect();this.env.dispose();

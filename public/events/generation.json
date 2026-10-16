@@ -1,0 +1,75 @@
+{
+  "date": "2026-10-16",
+  "tool": "imagegen",
+  "prompts": {
+    "backgrounds": [
+      {
+        "id": "bg01",
+        "prompt": "Use case: stylized-concept. Production background art for a Japanese full-color manga-style animal-adventure medal game, a modest island harbor postal service. Polished hand-drawn game illustration, convincing dimensional light and shadows, controlled detailed textures, deep forest green painted equipment, white plaster, restrained natural wood and cool blue sea. Clean neutral whites, NO sepia, NO yellow filter, no aged paper. Wide landscape 16:9 composition. Eye-level fixed camera, spacious low-detail foreground for superimposed character cutouts, uncluttered upper center for speech balloons. Architectural perspective consistent, tasteful lived-in spaces, quiet specific place rather than generic fantasy. No people, no animals, no characters, no letters/words, no logos, no speech bubbles, no interface, no reward numbers. One single cohesive scene, not a collage.\nScene: Morning outside a small harbor post office. White plaster walls, deep green door, timber awning, a small blank sign, cobbled courtyard, distant fishing harbor. Open foreground center."
+      },
+      {
+        "id": "bg02",
+        "prompt": "Use case: stylized-concept. Production background art for a Japanese full-color manga-style animal-adventure medal game, a modest island harbor postal service. Polished hand-drawn game illustration, convincing dimensional light and shadows, controlled detailed textures, deep forest green painted equipment, white plaster, restrained natural wood and cool blue sea. Clean neutral whites, NO sepia, NO yellow filter, no aged paper. Wide landscape 16:9 composition. Eye-level fixed camera, spacious low-detail foreground for superimposed character cutouts, uncluttered upper center for speech balloons. Architectural perspective consistent, tasteful lived-in spaces, quiet specific place rather than generic fantasy. No people, no animals, no characters, no letters/words, no logos, no speech bubbles, no interface, no reward numbers. One single cohesive scene, not a collage.\nScene: Interior postal sorting room, daylight through side window. Wooden mail cubbies and deep-green metal sorting equipment in the back, worktables at edges. Open central foreground floor, blank envelopes in neat stacks, a route map without writing pinned on the wall."
+      },
+      {
+        "id": "bg03",
+        "prompt": "Use case: stylized-concept. Production background art for a Japanese full-color manga-style animal-adventure medal game, a modest island harbor postal service. Polished hand-drawn game illustration, convincing dimensional light and shadows, controlled detailed textures, deep forest green painted equipment, white plaster, restrained natural wood and cool blue sea. Clean neutral whites, NO sepia, NO yellow filter, no aged paper. Wide landscape 16:9 composition. Eye-level fixed camera, spacious low-detail foreground for superimposed character cutouts, uncluttered upper center for speech balloons. Architectural perspective consistent, tasteful lived-in spaces, quiet specific place rather than generic fantasy. No people, no animals, no characters, no letters/words, no logos, no speech bubbles, no interface, no reward numbers. One single cohesive scene, not a collage.\nScene: Wide wooden loading pier behind the post office. A small green-and-white postal boat tied beside it, ropes and low bollards along the edges, blue islands in distance, open foreground deck. Late afternoon with clean white highlights."
+      },
+      {
+        "id": "bg04",
+        "prompt": "Use case: stylized-concept. Production background art for a Japanese full-color manga-style animal-adventure medal game, a modest island harbor postal service. Polished hand-drawn game illustration, convincing dimensional light and shadows, controlled detailed textures, deep forest green painted equipment, white plaster, restrained natural wood and cool blue sea. Clean neutral whites, NO sepia, NO yellow filter, no aged paper. Wide landscape 16:9 composition. Eye-level fixed camera, spacious low-detail foreground for superimposed character cutouts, uncluttered upper center for speech balloons. Architectural perspective consistent, tasteful lived-in spaces, quiet specific place rather than generic fantasy. No people, no animals, no characters, no letters/words, no logos, no speech bubbles, no interface, no reward numbers. One single cohesive scene, not a collage.\nScene: A badger mechanic's harbor workshop WITHOUT any mechanic or animals. Sturdy green marine engine, steel tools on the back wall, timber benches at the sides, a plain wrapped parcel and spare boat fittings. Open center floor and restrained cool daylight."
+      },
+      {
+        "id": "bg05",
+        "prompt": "Use case: stylized-concept. Production background art for a Japanese full-color manga-style animal-adventure medal game, a modest island harbor postal service. Polished hand-drawn game illustration, convincing dimensional light and shadows, controlled detailed textures, deep forest green painted equipment, white plaster, restrained natural wood and cool blue sea. Clean neutral whites, NO sepia, NO yellow filter, no aged paper. Wide landscape 16:9 composition. Eye-level fixed camera, spacious low-detail foreground for superimposed character cutouts, uncluttered upper center for speech balloons. Architectural perspective consistent, tasteful lived-in spaces, quiet specific place rather than generic fantasy. No people, no animals, no characters, no letters/words, no logos, no speech bubbles, no interface, no reward numbers. One single cohesive scene, not a collage.\nScene: Postal dispatch dock gate: large industrial forest-green sliding hangar gate with silver fittings, white working lights, a glimpse of harbor beyond. Broad empty foreground floor for characters. Do NOT include a roulette, holes, a ball or lottery props."
+      },
+      {
+        "id": "bg06",
+        "prompt": "Use case: stylized-concept. Production background art for a Japanese full-color manga-style animal-adventure medal game, a modest island harbor postal service. Polished hand-drawn game illustration, convincing dimensional light and shadows, controlled detailed textures, deep forest green painted equipment, white plaster, restrained natural wood and cool blue sea. Clean neutral whites, NO sepia, NO yellow filter, no aged paper. Wide landscape 16:9 composition. Eye-level fixed camera, spacious low-detail foreground for superimposed character cutouts, uncluttered upper center for speech balloons. Architectural perspective consistent, tasteful lived-in spaces, quiet specific place rather than generic fantasy. No people, no animals, no characters, no letters/words, no logos, no speech bubbles, no interface, no reward numbers. One single cohesive scene, not a collage.\nScene: Celebratory departure at a sunny harbor. Small green-and-white postal boat heading toward a blue horizon, curved white wake, piers framing the sides, a few modest pennant flags. Beautiful calm sky and sea; open foreground pier for characters. No confetti covering everything."
+      },
+      {
+        "id": "bg07",
+        "prompt": "Use case: stylized-concept. Production background art for a Japanese full-color manga-style animal-adventure medal game, a modest island harbor postal service. Polished hand-drawn game illustration, convincing dimensional light and shadows, controlled detailed textures, deep forest green painted equipment, white plaster, restrained natural wood and cool blue sea. Clean neutral whites, NO sepia, NO yellow filter, no aged paper. Wide landscape 16:9 composition. Eye-level fixed camera, spacious low-detail foreground for superimposed character cutouts, uncluttered upper center for speech balloons. Architectural perspective consistent, tasteful lived-in spaces, quiet specific place rather than generic fantasy. No people, no animals, no characters, no letters/words, no logos, no speech bubbles, no interface, no reward numbers. One single cohesive scene, not a collage.\nScene: A low-tide landing beside a repaired little wooden boat, dock piles and a quiet island boathouse. Boat has a blank place to attach a brass nameplate. Gentle clear daylight, open foreground landing."
+      },
+      {
+        "id": "bg08",
+        "prompt": "Use case: stylized-concept. Production background art for a Japanese full-color manga-style animal-adventure medal game, a modest island harbor postal service. Polished hand-drawn game illustration, convincing dimensional light and shadows, controlled detailed textures, deep forest green painted equipment, white plaster, restrained natural wood and cool blue sea. Clean neutral whites, NO sepia, NO yellow filter, no aged paper. Wide landscape 16:9 composition. Eye-level fixed camera, spacious low-detail foreground for superimposed character cutouts, uncluttered upper center for speech balloons. Architectural perspective consistent, tasteful lived-in spaces, quiet specific place rather than generic fantasy. No people, no animals, no characters, no letters/words, no logos, no speech bubbles, no interface, no reward numbers. One single cohesive scene, not a collage.\nScene: A small harbor diner entrance in the rain, no customers. Broad dry awning for characters in foreground, wet stone pavement, green door, warm window light balanced against cool blue-grey rain, blank hanging sign, cozy but no overall yellow cast."
+      },
+      {
+        "id": "bg09",
+        "prompt": "Use case: stylized-concept. Production background art for a Japanese full-color manga-style animal-adventure medal game, a modest island harbor postal service. Polished hand-drawn game illustration, convincing dimensional light and shadows, controlled detailed textures, deep forest green painted equipment, white plaster, restrained natural wood and cool blue sea. Clean neutral whites, NO sepia, NO yellow filter, no aged paper. Wide landscape 16:9 composition. Eye-level fixed camera, spacious low-detail foreground for superimposed character cutouts, uncluttered upper center for speech balloons. Architectural perspective consistent, tasteful lived-in spaces, quiet specific place rather than generic fantasy. No people, no animals, no characters, no letters/words, no logos, no speech bubbles, no interface, no reward numbers. One single cohesive scene, not a collage.\nScene: A quiet cape cottage doorway overlooking a winding path, low fence and distant harbor. Dusk blue sky with a small warm light inside the door. Inviting ordinary home, no graveyard, no melodrama. Clear open foreground for two character cutouts."
+      }
+    ],
+    "sprites": [
+      [
+        "nagi",
+        "exec-e969f0d0-a7b7-458f-8887-0122a2a15bf4.png",
+        "NAGI young river otter courier, brown fur and cream muzzle, long thick tail, green rolled-sleeve jacket over white shirt and brown crossbody satchel. Normal: friendly waving with open manga eyes. Surprise: holding route map, wide graphic manga eyes and small angular gasp. Joy: letter held up, happy arc eyes, exuberant manga smile. Disappointed: shoulders dropped, satchel hugged, sad manga brows and mouth, eyes remain readable rather than sleepy."
+      ],
+      [
+        "mina",
+        "exec-98211256-ee80-4ee4-beca-ad49cb5298df.png",
+        "MINA white-and-grey gull courier with yellow beak and long bird legs, green scarf, brown leg message pouch. Wings not human hands. Normal: one wing pointing, alert open manga eyes. Surprise: lifted foot, wide manga eyes, angular open beak. Joy: raised wings, happy arc eyes, open beak. Disappointed: wings and head lowered, sad manga brows and modest downturned beak."
+      ],
+      [
+        "garo",
+        "exec-df2c6af6-bd4f-4586-b342-561838f4abb8.png",
+        "GARO adult tall broad-shouldered badger mechanic, black-white facial stripes, green rolled-sleeve jacket over white shirt, brown work apron, boots and spanner. Normal: folded arms, composed OPEN manga eyes. Surprise: raised palms and clearly wide graphic manga eyes. Joy: spanner and thumbs up, bold manga smile and happy arc eyes. Disappointed: one hand behind neck, apologetic sad brows and a small downward mouth. Mature but not permanently squinting."
+      ]
+    ]
+  },
+  "files": {
+    "bg01": "/workspace/scratch/ac4bf79028ac/generated_images/exec-97cb2ef9-5956-43ad-ab22-de1841f027e9.png",
+    "bg02": "/workspace/scratch/ac4bf79028ac/generated_images/exec-24860f88-9305-4315-9b86-27d867ba8709.png",
+    "bg03": "/workspace/scratch/ac4bf79028ac/generated_images/exec-b4cf9b75-ddf1-4347-a86a-dd877dd8d9cf.png",
+    "bg04": "/workspace/scratch/ac4bf79028ac/generated_images/exec-5a0121de-a9ba-44d4-877b-06becc1b40a2.png",
+    "bg05": "/workspace/scratch/ac4bf79028ac/generated_images/exec-4780bbff-cf7e-4f8c-b17f-8989033dfc31.png",
+    "bg06": "/workspace/scratch/ac4bf79028ac/generated_images/exec-296e7e29-0f71-41fe-b3a5-9a71b2c7a4bd.png",
+    "bg07": "/workspace/scratch/ac4bf79028ac/generated_images/exec-f180a551-ea91-4b5f-8867-ba40b38b45fc.png",
+    "bg08": "/workspace/scratch/ac4bf79028ac/generated_images/exec-371d6356-8ca2-4e5f-b83e-baa29a96cb60.png",
+    "bg09": "/workspace/scratch/ac4bf79028ac/generated_images/exec-0b0e9edb-f012-4b83-9738-929e12c54378.png",
+    "nagi": "/workspace/scratch/ac4bf79028ac/generated_images/exec-1ab82957-ad2d-4688-9f6e-319070fdf4b9.png",
+    "mina": "/workspace/scratch/ac4bf79028ac/generated_images/exec-3eef7ac0-c029-4f02-bda2-06ea5b154826.png",
+    "garo": "/workspace/scratch/ac4bf79028ac/generated_images/exec-248d1bae-b914-4caa-9d5c-ddd0a5448566.png"
+  }
+}
