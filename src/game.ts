@@ -94,6 +94,7 @@ export class Game {
     const s = this.state;
     ticket.applied = true;
     switch (ticket.result) {
+      case 'FIELD_5': this.payout(5); break;
       case 'CREDIT_10': this.payout(10); break;
       case 'BALL_1': s.ballJobs++; break;
       case 'TOWER_STANDARD': s.towerJobs++; break;

@@ -1,11 +1,33 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { Game, type Ticket } from '../src/game.ts';
+import { draw, Game, type Ticket } from '../src/game.ts';
 import { NORMAL, JPC } from '../src/config.ts';
 
 test('probability tables cover exactly 100 percent',()=>{
   assert.equal(NORMAL.reduce((n,r)=>n+r[1],0),100);
   assert.equal(JPC.reduce((n,r)=>n+r[1],0),100);
+});
+test('all 100 equal-width draws match the requested normal and JP percentages',()=>{
+  const g=new Game(undefined,12);
+  const counts=(table:typeof NORMAL)=>{
+    const tally:Record<string,number>={};
+    for(let i=0;i<100;i++){
+      g.random[0].next=()=>(i+.5)/100;
+      const result=draw(g.random[0],table);tally[result]=(tally[result]??0)+1;
+    }
+    return tally;
+  };
+  assert.deepEqual(counts(NORMAL),{NONE:20,FIELD_5:20,CREDIT_10:35,BALL_1:18,TOWER_STANDARD:4,JPC_ENTRY:2,JACKPOT_DIRECT:1});
+  assert.deepEqual(counts(JPC),{CREDIT_10:70,FIELD_30:20,JACKPOT:10});
+});
+test('a five-medal prize survives save and skip without rerolling or double payout',()=>{
+  const g=new Game(undefined,12);
+  g.state.active={id:1,kind:'normal',result:'FIELD_5',elapsed:.5,applied:false};
+  const copy=new Game(g.export());copy.skip();copy.skip();
+  assert.equal(copy.state.payouts.length,1);assert.equal(copy.state.payouts[0].remaining,5);
+  assert.equal(copy.state.wallet,100);assert.equal(copy.state.won,0);assert.equal(copy.state.gauge,0);
+  const resumed=new Game(copy.export());resumed.skip();
+  assert.equal(resumed.state.payouts[0].remaining,5);
 });
 test('large simultaneous collections issue every ticket and preserve remainder',()=>{
   const g=new Game(undefined,12);g.state.gauge=24;g.collectCoins(71);
