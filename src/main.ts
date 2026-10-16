@@ -157,6 +157,7 @@ function updateUI() {
   if(s.wallet===0)release();
   const payout=s.payouts.reduce((n,p)=>n+p.remaining,0);
   const supply:string[]=[];
+  if(theater.boardBlocked)supply.push('イベント表示中・盤面停止');
   if(feed.automatic)supply.push(s.feedQueue?.automatic?'タイミング投入中':'押し台のタイミングを待っています');
   else if(s.feedQueue)supply.push(`連続投入 残り${s.feedQueue.remaining}枚`);
   if(payout)supply.push(`盤面へ払出し 残り${payout}枚`);
