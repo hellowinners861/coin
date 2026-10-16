@@ -1,6 +1,7 @@
 import { revealTime, stops } from './events/challenge';
 import { makePlan, type DrawPlan, type DrawSnapshot } from './events/draw';
 import { JPC, MINI_BALL_LIMIT, NORMAL, RESULT_LABELS, type Result } from './config';
+import { makeUpgradePlan,REFIT_CHOICE_SECONDS,REFIT_BRIDGE_SECONDS,type JPItems,type JPRefit,upgradeInfo } from './events/jp';
 
 export class Random {
   constructor(public value: number) { this.value >>>= 0; }
@@ -17,11 +18,12 @@ export function draw(rng: Random, table: readonly [Result, number][]): Result {
   for (const [value, weight] of table) { roll -= weight; if (roll < 0) return value; }
   throw new Error('Invalid probability table');
 }
-export type Ticket = { id: number; kind: 'normal' | 'jpc' | 'mini' | 'station'; result?: Result; elapsed: number; applied: boolean; physical?: boolean; plan?: DrawPlan; drawSave?: DrawSnapshot; resolvedAt?: number; route?:number; stampApplied?:boolean; routeCompleted?:boolean; qualifier?: {plan:DrawPlan; drawSave?:DrawSnapshot; pocket?:number; resolvedAt?:number} };
+export type Ticket = { id: number; kind: 'normal' | 'jpc' | 'mini' | 'station'; result?: Result; elapsed: number; applied: boolean; physical?: boolean; plan?: DrawPlan; drawSave?: DrawSnapshot; refit?:JPRefit; resolvedAt?: number; route?:number; stampApplied?:boolean; routeCompleted?:boolean; kitGranted?:boolean; qualifier?: {plan:DrawPlan; drawSave?:DrawSnapshot; pocket?:number; resolvedAt?:number} };
 export type Payout = { id: number; remaining: number; total: number };
 export type FeedQueue = { remaining: number; nextAt: number; automatic: boolean; deadline: number | null };
 export type GameState = {
   deliveryStamps?:number[]; deliveryCompleted?:number[];
+  jpItems?:JPItems; jpFailures?:number;
   diaryUnlocked?: number; diaryRead?: number; theater?: { ticket: number; position: 'center'|'upper'; drawUpper?: boolean; boardResumed?:boolean; journal: number|null; journalTime: number };
   wallet: number; won: number; paid: number; direct: number; gauge: number; balls: number;
   inputRemainder: number; ballJobs: number; towerJobs: number; jackpots: number;
@@ -99,7 +101,13 @@ export class Game {
     const a=this.state.active;if(!a||a.id!==id||a.kind!=='mini'||a.stampApplied||!Number.isInteger(route)||route<0||route>2)return false;
     const stamps=this.state.deliveryStamps??=[0,0,0],completed=this.state.deliveryCompleted??=[0,0,0];
     a.route=route;a.stampApplied=true;a.resolvedAt=a.elapsed;stamps[route]++;
-    if(stamps[route]>=3){stamps[route]-=3;completed[route]++;a.routeCompleted=true;this.enqueue('station',route);}
+    if(stamps[route]>=3){
+      stamps[route]-=3;completed[route]++;a.routeCompleted=true;this.enqueue('station',route);
+      const kit=this.state.jpItems??={lights:0,charts:0,shields:0};
+      a.kitGranted=route===0?kit.lights<2:route===1?kit.charts<1:kit.shields<1;
+      if(route===0)kit.lights=Math.min(2,kit.lights+1);
+      else if(route===1)kit.charts=1;else kit.shields=1;
+    }
     this.onSound('event');this.onDurableChange();this.onChange();return true;
   }
   private defaultMiniRoute(){const stamps=this.state.deliveryStamps??[0,0,0];return stamps.indexOf(Math.max(...stamps));}
@@ -112,6 +120,39 @@ export class Game {
     a.qualifier.pocket=pocket;a.qualifier.resolvedAt=a.elapsed;a.route=pocket%3;this.onSound('event');
     this.onDurableChange();this.onChange();return true;
   }
+  private beginUpgrade(a:Ticket){
+    const r=a.refit!;r.attempts.push({plan:makeUpgradePlan(()=>this.random[2].next())});r.phase='refit';
+    delete r.decisionAt;
+  }
+  resolveUpgrade(id:number,pocket:number){
+    const a=this.state.active,r=a?.refit,attempt=r?.attempts.at(-1);
+    if(!a||a.id!==id||a.applied||!r||r.phase!=='refit'||!attempt||attempt.pocket!==undefined||!Number.isInteger(pocket)||pocket<0||pocket>9)return false;
+    attempt.pocket=pocket;attempt.resolvedAt=a.elapsed;
+    const effect=attempt.plan.labels[pocket];r.who=upgradeInfo[effect].who;
+    if(effect==='LIGHT'||effect==='BEACON'){
+      const before=r.slots;r.slots=Math.min(5,r.slots+(effect==='LIGHT'?1:2));
+      r.message=r.slots===before?'灯台は全灯！ JPは5マスのままだよ。':`灯りがついた！ JP ${before} → ${r.slots}マス！`;
+    }else if(effect==='WIND'){
+      if(r.shield){r.shield=false;r.who='garo';r.message='補強が効いた。JPマスは守ったぞ。';}
+      else{const before=r.slots;r.slots=Math.max(1,r.slots-1);r.message=before===1?'強い風！ でも最後のJPマスは消えないよ。':`突風だ！ JP ${before} → ${r.slots}マス。`;}
+    }else if(effect==='SHIELD'){r.message=r.shield?'補強は万全。盾は1個まで持てるぞ。':'補強した。次の突風を1回防ぐぞ。';r.shield=true;}
+    else if(effect==='CARGO'){this.payout(10);r.message='積荷を発見！ 10枚を左から払い出すよ。';}
+    else r.message='準備完了！ この灯りで出航しよう。';
+    r.phase='choice';r.decisionAt=a.elapsed;
+    if(effect==='DEPART'||r.attempts.length>=r.maxBalls)this.depart(a);
+    this.onSound('event');this.onDurableChange();this.onChange();return true;
+  }
+  chooseRefit(id:number,keepGoing:boolean){
+    const a=this.state.active,r=a?.refit;
+    if(!a||a.id!==id||a.applied||!r||r.phase!=='choice')return false;
+    if(keepGoing&&r.attempts.length<r.maxBalls)this.beginUpgrade(a);else this.depart(a);
+    this.onDurableChange();this.onChange();return true;
+  }
+  private depart(a:Ticket){
+    const r=a.refit!;r.phase='final';r.finalAt=a.elapsed+REFIT_BRIDGE_SECONDS;
+    // Mint and freeze the final labels before launching the final ball.
+    a.plan=makePlan(()=>this.random[2].next(),r.slots);delete a.drawSave;
+  }
   apply(ticket: Ticket) {
     if (ticket.applied || !ticket.result) return;
     const s = this.state;
@@ -123,7 +164,7 @@ export class Game {
       case 'TOWER_STANDARD': s.towerJobs++; break;
       case 'JPC_ENTRY': this.enqueue('jpc'); break;
       case 'FIELD_30': this.payout(30); break;
-      case 'JACKPOT': case 'JACKPOT_DIRECT': s.jackpots++; s.diaryUnlocked=Math.min(3,(s.diaryUnlocked??0)+1); this.payout(300); break;
+      case 'JACKPOT': case 'JACKPOT_DIRECT': s.jackpots++; s.jpFailures=0;s.diaryUnlocked=Math.min(3,(s.diaryUnlocked??0)+1); this.payout(300); break;
     }
     this.onSound(ticket.result.includes('JACKPOT') ? 'jackpot' : 'event');
   }
@@ -135,7 +176,12 @@ export class Game {
     if(this.cinematic&&s.theater?.journal!==null&&s.theater?.journal!==undefined)return;
     if (!s.active && s.queue.length) {
       const ticket = s.queue.shift()!;
-      if(this.cinematic&&ticket.kind==='jpc'){ticket.physical=true;ticket.plan=makePlan(()=>this.random[2].next());ticket.qualifier={plan:makePlan(()=>this.random[2].next())};}
+      if(this.cinematic&&ticket.kind==='jpc'){
+        ticket.physical=true;ticket.plan=makePlan(()=>this.random[2].next());ticket.qualifier={plan:makePlan(()=>this.random[2].next())};
+        const kit=s.jpItems??{lights:0,charts:0,shields:0},rescue=(s.jpFailures??0)>=3;
+        ticket.refit={slots:1+kit.lights+(rescue?1:0),shield:kit.shields>0,maxBalls:3+kit.charts,attempts:[],phase:'refit',message:'灯台をともして、特別便の準備をしよう。',who:'nagi'};
+        s.jpItems={lights:0,charts:0,shields:0};if(rescue)s.jpFailures=0;
+      }
       else if(ticket.kind!=='mini')ticket.result = draw(this.random[ticket.kind === 'jpc' ? 2 : 0], ticket.kind === 'jpc' ? JPC : NORMAL);
       s.active = ticket;
       this.onDurableChange(); this.onChange();
@@ -148,7 +194,14 @@ export class Game {
       if(a.stampApplied&&a.elapsed>(a.resolvedAt??a.elapsed)+(this.cinematic?2.4:.5)){s.active=null;this.onDurableChange();}
       return;
     }
-    if(a.physical){if(a.applied&&a.elapsed>(a.resolvedAt??a.elapsed)+5){s.active=null;this.onDurableChange();}return;}
+    if(a.physical){
+      const r=a.refit;
+      if(!a.applied&&r){
+        if(r.phase==='refit'&&!r.attempts.length&&a.qualifier?.pocket!==undefined&&a.elapsed>=(a.qualifier.resolvedAt??a.elapsed)+REFIT_BRIDGE_SECONDS){this.beginUpgrade(a);this.onDurableChange();}
+        if(r.phase==='choice'&&a.elapsed>=(r.decisionAt??a.elapsed)+REFIT_CHOICE_SECONDS)this.chooseRefit(a.id,false);
+      }
+      if(a.applied&&a.elapsed>(a.resolvedAt??a.elapsed)+5){s.active=null;this.onDurableChange();}return;
+    }
     const reveal = this.cinematic ? revealTime(a) : a.kind === 'normal' ? 1.0 : 2.0;
     if (a.elapsed >= reveal && !a.applied) {
       this.apply(a); this.onDurableChange(); this.onChange();
@@ -157,7 +210,8 @@ export class Game {
   }
   resolveDraw(id:number,result:Result){
     const a=this.state.active;
-    if(!a||a.id!==id||!a.physical||a.applied||(a.qualifier&&(a.qualifier.pocket===undefined||a.elapsed<(a.qualifier.resolvedAt??a.elapsed)+2.4))||!['CREDIT_10','FIELD_30','JACKPOT'].includes(result))return false;
+    if(!a||a.id!==id||!a.physical||a.applied||(a.qualifier&&(a.qualifier.pocket===undefined||a.elapsed<(a.qualifier.resolvedAt??a.elapsed)+2.4))||(a.refit&&(a.refit.phase!=='final'||a.elapsed<(a.refit.finalAt??Infinity)))||!['CREDIT_10','FIELD_30','JACKPOT'].includes(result))return false;
+    if(a.refit)this.state.jpFailures=result==='JACKPOT'?0:Math.min(3,(this.state.jpFailures??0)+1);
     a.result=result;a.resolvedAt=a.elapsed;this.apply(a);this.onDurableChange();this.onChange();return true;
   }
   skip() {

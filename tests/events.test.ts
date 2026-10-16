@@ -15,7 +15,9 @@ test('physical ticket cannot be paid or skipped before a real result; resolve an
  const g=new Game(undefined,441);g.cinematic=true;g.enqueue('jpc');g.tick(.1);const a=g.state.active!;
  assert.equal(a.physical,true);assert.equal(a.result,undefined);g.skip();g.tick(40);assert.equal(g.state.active?.id,a.id);assert.equal(g.state.payouts.length,0);
  assert.equal(g.resolveDraw(a.id+1,'JACKPOT'),false);assert.equal(g.resolveDraw(a.id,'TOWER_STANDARD'),false);
- assert.equal(g.resolveDraw(a.id,'JACKPOT'),false);assert.equal(g.completeQualifier(a.id,2),true);g.tick(2.5);assert.equal(g.resolveDraw(a.id,'JACKPOT'),true);assert.equal(g.resolveDraw(a.id,'JACKPOT'),false);
+ assert.equal(g.resolveDraw(a.id,'JACKPOT'),false);assert.equal(g.completeQualifier(a.id,2),true);g.tick(2.5);
+ assert.equal(g.resolveDraw(a.id,'JACKPOT'),false);assert.equal(g.resolveUpgrade(a.id,a.refit!.attempts[0].plan.labels.indexOf('DEPART')),true);g.tick(2.5);
+ assert.equal(g.resolveDraw(a.id,'JACKPOT'),true);assert.equal(g.resolveDraw(a.id,'JACKPOT'),false);
  const copy=new Game(g.export());copy.cinematic=true;copy.skip();copy.skip();assert.equal(copy.state.payouts.length,1);assert.equal(copy.state.payouts[0].total,300);assert.equal(copy.state.jackpots,1);assert.equal(copy.state.diaryUnlocked,1);assert.equal(copy.state.wallet,100);
 });
 test('movies do not change normal rewards; diaries pause queued tickets and replay is not an award',()=>{
@@ -63,8 +65,9 @@ test('mini events autoplay and skip retain the stamp; staged reel stops do not r
  g.advancePresentation(a.id);assert.equal(a.elapsed,2.4);g.advancePresentation(a.id);assert.equal(a.elapsed,4.2);g.advancePresentation(a.id);assert.equal(a.elapsed,8.4);g.tick(.01);
  assert.equal(g.random[0].value,rng);assert.equal(a.applied,true);
 });
-test('a saved two-ball JP never pays the route ball and settles exactly once on the final ball',async()=>{
+test('a legacy saved two-ball JP keeps its original flow and settles exactly once',async()=>{
  await RAPIER.init();const g=new Game(undefined,827);g.cinematic=true;g.enqueue('jpc');g.tick(5.4);const a=g.state.active!;
+ delete a.refit; // Prior released saves have no refit state; do not retrofit an in-flight ball.
  const first=new PhysicalDraw(a.qualifier!.plan);while(first.pocket===null&&first.elapsed<24)first.step(1/60);assert.notEqual(first.pocket,null);
  a.qualifier!.drawSave=first.export();assert.equal(g.completeQualifier(a.id,first.pocket!),true);first.dispose();assert.equal(g.state.payouts.length,0);assert.equal(g.resolveDraw(a.id,'JACKPOT'),false);
  const copy=new Game(g.export());copy.cinematic=true;copy.tick(2.5);const b=copy.state.active!,plan={...b.plan!,seed:(b.plan!.seed+Math.imul(b.route!,2654435761))>>>0};

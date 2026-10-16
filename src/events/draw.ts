@@ -2,12 +2,16 @@ import RAPIER from '@dimforge/rapier3d-compat';
 import type { Result } from '../config';
 // Labels are shuffled independently of launch physics. Every physical pocket has
 // the same marginal reward distribution, even when pocket frequencies differ.
-export type DrawPlan = { labels: Result[]; seed: number };
+export type DrawPlan<L extends string=Result> = { labels: L[]; seed: number };
 export type DrawSnapshot = { world: Uint8Array; ball: number; elapsed: number; retry: number; pocket: number | null; gates: number[]; accumulator:number };
-export function makePlan(next:()=>number):DrawPlan {
-  const labels:Result[]=[...Array(7).fill('CREDIT_10'), 'FIELD_30','FIELD_30','JACKPOT'];
+export function shuffledPlan<L extends string>(labels:L[],next:()=>number):DrawPlan<L> {
+  labels=[...labels];
   for(let i=9;i>0;i--){const j=Math.floor(next()*(i+1));[labels[i],labels[j]]=[labels[j],labels[i]];}
   return {labels,seed:Math.floor(next()*4294967296)};
+}
+export function makePlan(next:()=>number,jpSlots=1):DrawPlan {
+  if(!Number.isInteger(jpSlots)||jpSlots<1||jpSlots>5)throw new Error('JP slots must be between one and five');
+  return shuffledPlan<Result>([...Array(8-jpSlots).fill('CREDIT_10'),'FIELD_30','FIELD_30',...Array(jpSlots).fill('JACKPOT')],next);
 }
 export const pockets=Array.from({length:10},(_,i)=>({x:Math.cos(i*Math.PI/5)*.52,z:Math.sin(i*Math.PI/5)*.52}));
 export function floorMesh() {
@@ -24,9 +28,9 @@ export function floorMesh() {
   }
   return {vertices:new Float32Array(vertices),indices:new Uint32Array(indices)};
 }
-export class PhysicalDraw {
+export class PhysicalDraw<L extends string=Result> {
   world:RAPIER.World;ball:RAPIER.RigidBody;elapsed=0;retry=0;pocket:number|null=null;gates:number[]=[];accumulator=0;
-  constructor(public plan:DrawPlan,saved?:DrawSnapshot) {
+  constructor(public plan:DrawPlan<L>,saved?:DrawSnapshot) {
     if(saved){this.world=RAPIER.World.restoreSnapshot(saved.world);this.ball=this.world.getRigidBody(saved.ball);this.elapsed=saved.elapsed;this.retry=saved.retry;this.pocket=saved.pocket;this.gates=saved.gates??[];this.accumulator=saved.accumulator??0;return;}
     this.world=new RAPIER.World({x:0,y:-9.81,z:0});this.world.timestep=1/120;
     const mesh=floorMesh();this.world.createCollider(RAPIER.ColliderDesc.trimesh(mesh.vertices,mesh.indices).setFriction(.035).setRestitution(.12));
