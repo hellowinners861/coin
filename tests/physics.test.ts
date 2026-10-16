@@ -362,3 +362,43 @@ for(const count of [1,3] as const)for(const angle of [0,-LIMIT,LIMIT])test(`auto
     assert.ok(s.actors.filter(a=>a.source==='player').every(a=>s.body(a).isDynamic()));
   }finally{s.dispose();}
 });
+
+test('a loaded tower entrance starts immediately and physically displaces its existing medals',()=>{
+ const g=new Game(undefined,123),s=new Simulation(g);empty(s);
+ for(let x=-1;x<=1;x++)for(let z=-1;z<=1;z++)s.spawn('coin',v(TOWER.x+x*1.02,.008+THICKNESS/2+.003,TOWER.z+z*1.02),'test');
+ const original=s.actors.map(a=>({a,p:s.position(a)}));g.state.towerJobs=1;
+ try{
+  s.step(false);assert.equal(s.towerPhase,'closing');assert.equal(g.state.towerJobs,0);assert.equal(s.coins(),9);
+  for(let n=1;n<2400;n++){s.step(false);assert.equal(s.anomaly,'');}
+  assert.equal(s.towerPhase,'standing');assert.equal(s.actors.filter(a=>a.tower).length,120);
+  assert.equal(s.coins()+g.state.won,129,'the old nine medals must be preserved');
+  assert.ok(original.filter(({a,p})=>!s.actors.includes(a)||Math.hypot(s.position(a).x-p.x,s.position(a).z-p.z)>.25).length>=6);
+  assert.ok(Math.max(...s.actors.filter(a=>a.tower).map(a=>s.position(a).y))>2);
+ }finally{s.dispose();}
+});
+test('a packed opening bank permits the tower, conserving medals including mini-ball payouts',()=>{
+ const g=new Game(undefined,321),s=new Simulation(g);g.state.towerJobs=1;
+ try{
+  const over=s.actors.filter(a=>a.kind==='coin'&&Math.abs(s.position(a).x-TOWER.x)<1.5&&Math.abs(s.position(a).z-TOWER.z)<1.5);assert.ok(over.length>5);
+  s.step(false);assert.equal(s.towerPhase,'closing');
+  for(let n=1;n<2400;n++){s.step(false);assert.equal(s.anomaly,'');}
+  assert.equal(s.actors.filter(a=>a.tower).length,120);
+  assert.equal(s.coins()+g.state.won+g.state.payouts.reduce((n,p)=>n+p.remaining,0),INITIAL_COINS+120+g.state.miniBallsCollected*10);
+ }finally{s.dispose();}
+});
+test('restoring a tower while its hatch opens does not wait for space or create another tower',()=>{
+ const g=new Game(undefined,123),s=new Simulation(g);empty(s);g.state.towerJobs=1;
+ while(s.towerPhase!=='opening')s.step(false);
+ for(let n=0;n<35;n++)s.step(false);
+ const saved=s.export(),copy=new Game(g.export()),r=new Simulation(copy,saved);
+ try{
+  assert.equal(r.towerPhase,'opening');assert.equal(copy.state.towerJobs,0);assert.deepEqual(r.hatchFront.translation(),s.hatchFront.translation());assert.deepEqual(r.hatchRear.translation(),s.hatchRear.translation());
+  for(let n=0;n<1800;n++){r.step(false);assert.equal(r.anomaly,'');}
+  assert.equal(r.actors.filter(a=>a.tower).length,120);assert.equal(r.towerPhase,'standing');
+ }finally{s.dispose();r.dispose();}
+});
+test('older idle snapshots gain closed hatches without changing coins or entitlements',()=>{
+ const g=new Game(undefined,123),s=new Simulation(g);empty(s);s.lift.setTranslation(v(TOWER.x,-.12,TOWER.z),true);s.world.removeRigidBody(s.hatchFront);s.world.removeRigidBody(s.hatchRear);
+ const saved=s.export();delete saved.hatchFront;delete saved.hatchRear;delete saved.legacyTower;const r=new Simulation(new Game(g.export()),saved);
+ try{assert.equal(r.legacyTower,false);assert.ok(r.hatchFront&&r.hatchRear);assert.equal(r.coins(),0);assert.equal(r.game.state.towerJobs,0);r.step(false);assert.equal(r.anomaly,'');}finally{s.dispose();r.dispose();}
+});

@@ -1,3 +1,4 @@
+import { revealTime, stops } from './events/challenge';
 import { makePlan, type DrawPlan, type DrawSnapshot } from './events/draw';
 import { JPC, MINI_BALL_LIMIT, NORMAL, RESULT_LABELS, type Result } from './config';
 
@@ -16,10 +17,11 @@ export function draw(rng: Random, table: readonly [Result, number][]): Result {
   for (const [value, weight] of table) { roll -= weight; if (roll < 0) return value; }
   throw new Error('Invalid probability table');
 }
-export type Ticket = { id: number; kind: 'normal' | 'jpc'; result?: Result; elapsed: number; applied: boolean; physical?: boolean; plan?: DrawPlan; drawSave?: DrawSnapshot; resolvedAt?: number };
+export type Ticket = { id: number; kind: 'normal' | 'jpc' | 'mini' | 'station'; result?: Result; elapsed: number; applied: boolean; physical?: boolean; plan?: DrawPlan; drawSave?: DrawSnapshot; resolvedAt?: number; route?:number; stampApplied?:boolean; routeCompleted?:boolean; qualifier?: {plan:DrawPlan; drawSave?:DrawSnapshot; pocket?:number; resolvedAt?:number} };
 export type Payout = { id: number; remaining: number; total: number };
 export type FeedQueue = { remaining: number; nextAt: number; automatic: boolean; deadline: number | null };
 export type GameState = {
+  deliveryStamps?:number[]; deliveryCompleted?:number[];
   diaryUnlocked?: number; diaryRead?: number; theater?: { ticket: number; position: 'center'|'upper'; drawUpper?: boolean; boardResumed?:boolean; journal: number|null; journalTime: number };
   wallet: number; won: number; paid: number; direct: number; gauge: number; balls: number;
   inputRemainder: number; ballJobs: number; towerJobs: number; jackpots: number;
@@ -53,8 +55,8 @@ export class Game {
     this.state.random = this.random.map(r => r.value);
     return structuredClone(this.state);
   }
-  enqueue(kind: Ticket['kind']) {
-    this.state.queue.push({ id: this.state.nextId++, kind, elapsed: 0, applied: false });
+  enqueue(kind: Ticket['kind'],route?:number) {
+    this.state.queue.push({ id: this.state.nextId++, kind, elapsed: 0, applied: false,...(route===undefined?{}:{route}) });
   }
   spend(liveBalls: number, liveMiniBalls = 0): boolean {
     const s = this.state;
@@ -90,7 +92,25 @@ export class Game {
   collectMiniBall() {
     this.state.miniBallsCollected++;
     this.payout(10);
+    this.state.queue.push({id:this.state.nextId++,kind:'mini',result:'CREDIT_10',elapsed:0,applied:true});
     this.onSound('ball'); this.onChange(); this.onDurableChange();
+  }
+  chooseMiniRoute(id:number,route:number){
+    const a=this.state.active;if(!a||a.id!==id||a.kind!=='mini'||a.stampApplied||!Number.isInteger(route)||route<0||route>2)return false;
+    const stamps=this.state.deliveryStamps??=[0,0,0],completed=this.state.deliveryCompleted??=[0,0,0];
+    a.route=route;a.stampApplied=true;a.resolvedAt=a.elapsed;stamps[route]++;
+    if(stamps[route]>=3){stamps[route]-=3;completed[route]++;a.routeCompleted=true;this.enqueue('station',route);}
+    this.onSound('event');this.onDurableChange();this.onChange();return true;
+  }
+  private defaultMiniRoute(){const stamps=this.state.deliveryStamps??[0,0,0];return stamps.indexOf(Math.max(...stamps));}
+  advancePresentation(id:number){
+    const a=this.state.active;if(!a||a.id!==id||a.physical||a.kind==='mini'||a.applied)return;
+    const next=stops(a).find(t=>t>a.elapsed+.01);if(next!==undefined){a.elapsed=next;this.onSound('event');}this.onDurableChange();
+  }
+  completeQualifier(id:number,pocket:number){
+    const a=this.state.active;if(!a?.qualifier||a.id!==id||a.qualifier.pocket!==undefined||!Number.isInteger(pocket)||pocket<0||pocket>9)return false;
+    a.qualifier.pocket=pocket;a.qualifier.resolvedAt=a.elapsed;a.route=pocket%3;this.onSound('event');
+    this.onDurableChange();this.onChange();return true;
   }
   apply(ticket: Ticket) {
     if (ticket.applied || !ticket.result) return;
@@ -115,16 +135,21 @@ export class Game {
     if(this.cinematic&&s.theater?.journal!==null&&s.theater?.journal!==undefined)return;
     if (!s.active && s.queue.length) {
       const ticket = s.queue.shift()!;
-      if(this.cinematic&&ticket.kind==='jpc'){ticket.physical=true;ticket.plan=makePlan(()=>this.random[2].next());}
-      else ticket.result = draw(this.random[ticket.kind === 'normal' ? 0 : 2], ticket.kind === 'normal' ? NORMAL : JPC);
+      if(this.cinematic&&ticket.kind==='jpc'){ticket.physical=true;ticket.plan=makePlan(()=>this.random[2].next());ticket.qualifier={plan:makePlan(()=>this.random[2].next())};}
+      else if(ticket.kind!=='mini')ticket.result = draw(this.random[ticket.kind === 'jpc' ? 2 : 0], ticket.kind === 'jpc' ? JPC : NORMAL);
       s.active = ticket;
       this.onDurableChange(); this.onChange();
     }
     const a = s.active;
     if (!a) return;
     a.elapsed += dt;
+    if(a.kind==='mini'){
+      if(!a.stampApplied&&a.elapsed>=(this.cinematic?5:.5))this.chooseMiniRoute(a.id,this.defaultMiniRoute());
+      if(a.stampApplied&&a.elapsed>(a.resolvedAt??a.elapsed)+(this.cinematic?2.4:.5)){s.active=null;this.onDurableChange();}
+      return;
+    }
     if(a.physical){if(a.applied&&a.elapsed>(a.resolvedAt??a.elapsed)+5){s.active=null;this.onDurableChange();}return;}
-    const reveal = this.cinematic ? 5.4 : a.kind === 'normal' ? 1.0 : 2.0;
+    const reveal = this.cinematic ? revealTime(a) : a.kind === 'normal' ? 1.0 : 2.0;
     if (a.elapsed >= reveal && !a.applied) {
       this.apply(a); this.onDurableChange(); this.onChange();
     }
@@ -132,11 +157,12 @@ export class Game {
   }
   resolveDraw(id:number,result:Result){
     const a=this.state.active;
-    if(!a||a.id!==id||!a.physical||a.applied||!['CREDIT_10','FIELD_30','JACKPOT'].includes(result))return false;
+    if(!a||a.id!==id||!a.physical||a.applied||(a.qualifier&&(a.qualifier.pocket===undefined||a.elapsed<(a.qualifier.resolvedAt??a.elapsed)+2.4))||!['CREDIT_10','FIELD_30','JACKPOT'].includes(result))return false;
     a.result=result;a.resolvedAt=a.elapsed;this.apply(a);this.onDurableChange();this.onChange();return true;
   }
   skip() {
     if (!this.state.active) return;
+    if(this.state.active.kind==='mini'){if(!this.state.active.stampApplied)this.chooseMiniRoute(this.state.active.id,this.defaultMiniRoute());this.state.active=null;this.onDurableChange();this.onChange();return;}
     if(this.state.active.physical&&!this.state.active.applied){this.state.active.elapsed=Math.max(5.4,this.state.active.elapsed);return;}
     this.apply(this.state.active);
     this.state.active = null;
@@ -145,7 +171,7 @@ export class Game {
   activeLabel() {
     const a = this.state.active;
     if (!a) return null;
-    if (!a.applied) return { title: a.kind === 'normal' ? 'チャンス抽選' : 'ジャックポット抽選', detail: '結果を待っています…', revealing: true };
+    if (!a.applied) return { title: a.kind === 'mini'?'小包開封':a.kind==='station'?'航路チャレンジ':a.kind === 'normal' ? 'チャンス抽選' : 'ジャックポット抽選', detail: '結果を待っています…', revealing: true };
     return { ...RESULT_LABELS[a.result!], revealing: false };
   }
 }

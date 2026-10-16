@@ -46,7 +46,7 @@ test('mini balls pay ten onto the board without advancing normal balls or wins',
   const g=new Game(undefined,12);g.state.balls=2;
   g.collectMiniBall();
   assert.equal(g.state.wallet,100);assert.equal(g.state.won,0);assert.equal(g.state.gauge,0);
-  assert.equal(g.state.balls,2);assert.equal(g.state.queue.length,0);
+  assert.equal(g.state.balls,2);assert.equal(g.state.queue.length,1);assert.equal(g.state.queue[0].kind,'mini');
   assert.equal(g.state.payouts[0].remaining,10);assert.equal(g.state.miniBallsCollected,1);
   const copy=new Game(g.export());assert.equal(copy.state.payouts[0].remaining,10);
   assert.equal(copy.state.miniBallsCollected,1);
