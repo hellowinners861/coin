@@ -15,7 +15,7 @@ export class DrawView {
    const gate=new THREE.Mesh(new THREE.CylinderGeometry(.143,.143,.012,32),new THREE.MeshStandardMaterial({color:'#607b6b',metalness:.65,roughness:.38}));gate.position.set(p.x,.005,p.z);this.scene.add(gate);this.gates.push(gate);
    const well=new THREE.Mesh(new THREE.CylinderGeometry(.144,.144,.16,24,1,true),new THREE.MeshStandardMaterial({color:'#0b1917',side:THREE.DoubleSide}));well.position.set(p.x,-.065,p.z);this.scene.add(well);
    const canvas=document.createElement('canvas');canvas.width=128;canvas.height=64;const ctx=canvas.getContext('2d')!;ctx.fillStyle=color;ctx.font='bold 32px sans-serif';ctx.textAlign='center';ctx.fillText(result==='JACKPOT'?'JP':result==='FIELD_30'?'30':'10',64,43);
-   const tex=new THREE.CanvasTexture(canvas);tex.colorSpace=THREE.SRGBColorSpace;const label=new THREE.Sprite(new THREE.SpriteMaterial({map:tex,depthTest:false}));label.scale.set(.14,.07,1);label.position.set(p.x*.76,.15,p.z*.76);this.scene.add(label);
+   const tex=new THREE.CanvasTexture(canvas);tex.colorSpace=THREE.SRGBColorSpace;const label=new THREE.Sprite(new THREE.SpriteMaterial({map:tex,depthTest:false,toneMapped:false}));label.scale.set(.19,.095,1);label.position.set(p.x*.76,.15,p.z*.76);this.scene.add(label);
   });
   this.ball=new THREE.Mesh(new THREE.SphereGeometry(.048,24,16),new THREE.MeshStandardMaterial({color:'#f5eee0',metalness:.35,roughness:.17}));this.scene.add(this.ball);
  }
