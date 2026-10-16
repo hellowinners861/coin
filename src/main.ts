@@ -71,7 +71,7 @@ app.innerHTML=`
   <dialog id="help">
     <div class="dialog-header"><h2>遊び方</h2><button type="button" data-close>閉じる</button></div>
     <ul><li>左下の「1プッシュ」で1枚／3枚を切り替えます。3枚は間隔をあけて順に投入し、手持ちも1枚ずつ使います。長押しで連続投入できます。</li><li>盤面を左右にドラッグして投入口の向きを調整します。</li><li>「自動投入」をONにすると、レールを進む時間を見込んで上段が一番手前へ出る頃を狙います。1枚／3枚の設定に従い、1往復につき1回投入します。獲得枚数を保証するものではありません。</li><li>自動投入はOFFボタンで停止。手持ち0枚で自動停止し、追加後はONにし直してください。再読込時もOFFで始まります。</li><li>手前へ落ちたメダルを獲得。横落ちはありません。</li><li>30枚獲得するごとにイベント。ボール3個の回収でジャックポット抽選です。</li><li>タワーは右奥の床扉を開き、メダルを押しのけながら床下からせり上がります。土台を押して崩しましょう。</li><li>手持ちが0枚になると100枚を無料で追加できます。「落下を待つ」を選んだ後も、画面下の追加ボタンから受け取れます。</li></ul>
-    <h3>イベントの進め方</h3><p>通常イベントは3リールの停止、リーチ、配達チャレンジを経て結果が出ます。「停止・次へ」で演出を進められます。当選率は変わりません。</p><p>ミニボールを回収すると10枚を払い出し、小包開封イベントが始まります。灯台・海路・工房から配達先を選んでスタンプを集めましょう。同じ航路のスタンプ3個で追加の航路チャレンジが始まります。5秒間選ばない場合や演出を閉じた場合は、完成に近い航路を自動で選びます。スタンプは保存されます。</p><h3>イベント画面</h3><p>港の郵便局の会話が上のモニターに流れます。イベント画面は盤面の上の専用エリアに表示します。上へスワイプ、または「小さく」で縮小できます。「大きく」で戻せます。JPは2球の物理抽選です。第1球で航路を決め、第2球で報酬を決めます。第1球ではメダルは増えません。最終抽選では10個の穴へ球を転がし、入った穴で報酬が決まります。10枚の穴が7個、30枚が2個、JPが1個。配置は投球前に決まり、球が転がり出してから当たり穴を変更しません。抽選を上へ送った後は「盤面を再開」でプレイを続けられます。JPで配達日誌が開き、設定から読み返せます。</p><h3>報酬の受け取り方</h3><p>5枚・10枚・30枚・JP300枚の報酬は、上段が一番手前に来た時に左横の射出口から奥側へ払い出します。手前へ落とすと手持ちに加わります。水色のミニボールを落とすと10枚を払い出し、大きいボールのJP進行とは別です。</p>
+    <h3>イベントの進め方</h3><p>通常イベントは3リールの停止、リーチ、配達チャレンジを経て結果が出ます。「停止・次へ」で演出を進められます。当選率は変わりません。</p><p>ミニボールを回収すると10枚を払い出し、小包開封イベントが始まります。灯台・海路・工房から配達先を選んでスタンプを集めましょう。同じ航路のスタンプ3個で追加の航路チャレンジが始まります。5秒間選ばない場合や演出を閉じた場合は、完成に近い航路を自動で選びます。スタンプは保存されます。</p><h3>イベント画面</h3><p>港の郵便局の会話が上のモニターに流れます。イベント画面は盤面の上の専用エリアに表示します。上へスワイプ、または「小さく」で縮小できます。「大きく」で戻せます。JPは2球の物理抽選です。第1球で航路を決め、第2球で報酬を決めます。第1球ではメダルは増えません。最終抽選では10個の穴へ球を転がし、入った穴で報酬が決まります。10枚の穴が7個、30枚が2個、JPが1個。配置は投球前に決まり、球が転がり出してから当たり穴を変更しません。会話・リール・ボール抽選の最中も盤面、手動投入、自動投入、払出しは動き続けます。抽選中は「物語へ」「抽選へ」で同じモニターの内容を切り替えられます。JPで配達日誌が開き、設定から読み返せます。</p><h3>報酬の受け取り方</h3><p>5枚・10枚・30枚・JP300枚の報酬は、上段が一番手前に来た時に左横の射出口から奥側へ払い出します。手前へ落とすと手持ちに加わります。水色のミニボールを落とすと10枚を払い出し、大きいボールのJP進行とは別です。</p>
     <details><summary>抽選の確率とボール追加</summary><p>通常イベント：報酬なし20%、5枚20%、10枚35%、ボール18%、タワー4%、JP抽選2%、JP直撃1%。JP抽選：10枚70%、盤面へ30枚20%、JP10%。メダル報酬はすべて盤面への払出しです。</p><p>手持ちから5枚投入するごとに20%で大きいボール追加。盤面の大きいボールは最大3個で、当選済みの追加報酬は空きができるまで保留されます。水色のミニボールは初期3個、投入10枚ごとに1個追加（盤面と追加待ち合わせて最大6個）。下段に供給され、1個落とすと10枚払出し。JP用の大きいボール3個には含めません。無料補充は続けるための手持ちとして追加します。</p></details>
     <p>PCでは左右キーで向きを調整し、スペースキーで投入できます。</p>
     <button type="button" class="primary resume" data-close>盤面へ戻る</button>
@@ -91,7 +91,7 @@ let fpsFrames=0,fpsTime=0,fps=0,physicsMs=0;
 
 function release() {holding=false;insert.classList.remove('pressed');}
 function requestInput() {
-  if(!ready||paused||theater.boardBlocked||feed.automatic)return;
+  if(!ready||paused||feed.automatic)return;
   audio.unlock();if(feed.requestManual()){lastInput=sim.time;saveWanted=true;}
 }
 function vibrate(pattern:number|number[]) {if(game?.state.vibration&&navigator.vibrate)navigator.vibrate(pattern);}
@@ -153,14 +153,13 @@ function updateUI() {
   $('batch-mode').setAttribute('aria-pressed',String(s.batchSize===3));
   $('auto-mode').setAttribute('aria-pressed',String(feed.automatic));
   $('auto-label').textContent=feed.automatic?'ON':'OFF';
-  $<HTMLButtonElement>('batch-mode').disabled=paused||theater.boardBlocked;
-  $<HTMLButtonElement>('auto-mode').disabled=paused||theater.boardBlocked||s.wallet===0;
+  $<HTMLButtonElement>('batch-mode').disabled=paused;
+  $<HTMLButtonElement>('auto-mode').disabled=paused||s.wallet===0;
   insert.innerHTML=feed.automatic?'自動投入中<small>左のボタンでOFF</small>':`メダル投入<small>1プッシュ ${s.batchSize}枚</small>`;
-  insert.disabled=paused||theater.boardBlocked||s.wallet===0||feed.automatic;
+  insert.disabled=paused||s.wallet===0||feed.automatic;
   if(s.wallet===0)release();
   const payout=s.payouts.reduce((n,p)=>n+p.remaining,0);
   const supply:string[]=[];
-  if(theater.boardBlocked)supply.push('イベント表示中・盤面停止');
   if(feed.automatic)supply.push(s.feedQueue?.automatic?'タイミング投入中':'押し台のタイミングを待っています');
   else if(s.feedQueue)supply.push(`連続投入 残り${s.feedQueue.remaining}枚`);
   if(payout)supply.push(`盤面へ払出し 残り${payout}枚`);
@@ -199,17 +198,17 @@ insert.addEventListener('contextmenu',e=>e.preventDefault());
 // Assistive technology and keyboard-generated button clicks have no pointerdown.
 insert.addEventListener('click',e=>{if(e.detail===0)requestInput();});
 $('batch-mode').addEventListener('click',()=>{
-  if(!ready||paused||theater.boardBlocked)return;release();game.state.batchSize=game.state.batchSize===1?3:1;
+  if(!ready||paused)return;release();game.state.batchSize=game.state.batchSize===1?3:1;
   saveWanted=true;void save(true);updateUI();
 });
 $('auto-mode').addEventListener('click',()=>{
-  if(!ready||paused||theater.boardBlocked)return;release();audio.unlock();feed.setAutomatic(!feed.automatic);updateUI();
+  if(!ready||paused)return;release();audio.unlock();feed.setAutomatic(!feed.automatic);updateUI();
 });
-scene.addEventListener('pointerdown',e=>{if(!ready||paused||theater.boardBlocked)return;scene.setPointerCapture(e.pointerId);drag=e.pointerId;dragX=e.clientX;dragAngle=sim.targetAngle;});
+scene.addEventListener('pointerdown',e=>{if(!ready||paused)return;scene.setPointerCapture(e.pointerId);drag=e.pointerId;dragX=e.clientX;dragAngle=sim.targetAngle;});
 scene.addEventListener('pointermove',e=>{if(e.pointerId!==drag)return;sim.setAngle(dragAngle+(e.clientX-dragX)/scene.clientWidth*LIMIT*2.5);});
 for(const type of ['pointerup','pointercancel','lostpointercapture'])scene.addEventListener(type,()=>{drag=null;});
 window.addEventListener('keydown',e=>{
-  if(!ready||paused||theater.boardBlocked||e.target instanceof HTMLInputElement||e.target instanceof HTMLSelectElement||e.target instanceof HTMLButtonElement)return;
+  if(!ready||paused||e.target instanceof HTMLInputElement||e.target instanceof HTMLSelectElement||e.target instanceof HTMLButtonElement)return;
   if(e.code==='Space'){e.preventDefault();if(!e.repeat){holding=true;requestInput();insert.classList.add('pressed');}}
   else if(e.code==='ArrowLeft'||e.code==='ArrowRight'){e.preventDefault();sim.setAngle(sim.targetAngle+(e.code==='ArrowRight'?1:-1)*Math.PI/180);}
   else if(e.code==='Escape')openDialog(settings);
@@ -275,7 +274,7 @@ function frame(now:number) {
   const elapsed=Math.min((now-lastFrame)/1000,.10);lastFrame=now;
   if(!paused&&!document.hidden) {
     game.tick(elapsed);theater.tick(elapsed);
-    if(theater.boardBlocked){accumulator=0;release();}else accumulator+=elapsed;
+    accumulator+=elapsed;
     let steps=0;const start=performance.now();
     while(accumulator>=DT&&steps<10) {
       if(holding&&sim.time-lastInput>=(game.state.batchSize===3?.8:1/3))requestInput();
