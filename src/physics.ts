@@ -328,7 +328,7 @@ export class Simulation {
     }
     this.tickTower();
   }
-  step() {
+  step(advanceGame=true) {
     this.time+=DT;
     const diff=this.targetAngle-this.angle;
     this.angle+=Math.max(-DT*.8,Math.min(DT*.8,diff));
@@ -380,7 +380,7 @@ export class Simulation {
       else if(a.kind==='miniBall')this.game.collectMiniBall();
       else this.game.collectBall();
     }
-    this.game.tick(DT);
+    if(advanceGame)this.game.tick(DT);
   }
   dispose() { this.events.free();this.world.free(); }
 }
