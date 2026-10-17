@@ -1,7 +1,7 @@
-import { revealTime, stops } from './events/challenge';
+import { revealTime, stops, resultDuration, stationTables } from './events/challenge';
 import { makePlan, type DrawPlan, type DrawSnapshot } from './events/draw';
 import { JPC, MINI_BALL_LIMIT, NORMAL, RESULT_LABELS, type Result } from './config';
-import { makeUpgradePlan,REFIT_CHOICE_SECONDS,REFIT_BRIDGE_SECONDS,type JPItems,type JPRefit,upgradeInfo } from './events/jp';
+import { makeUpgradePlan,makeRoutePlan,routeInfo,type RouteEffect,REFIT_CHOICE_SECONDS,REFIT_BRIDGE_SECONDS,type JPItems,type JPRefit,upgradeInfo } from './events/jp';
 
 export class Random {
   constructor(public value: number) { this.value >>>= 0; }
@@ -18,7 +18,7 @@ export function draw(rng: Random, table: readonly [Result, number][]): Result {
   for (const [value, weight] of table) { roll -= weight; if (roll < 0) return value; }
   throw new Error('Invalid probability table');
 }
-export type Ticket = { id: number; kind: 'normal' | 'jpc' | 'mini' | 'station'; result?: Result; elapsed: number; applied: boolean; physical?: boolean; plan?: DrawPlan; drawSave?: DrawSnapshot; refit?:JPRefit; resolvedAt?: number; route?:number; stampApplied?:boolean; routeCompleted?:boolean; kitGranted?:boolean; qualifier?: {plan:DrawPlan; drawSave?:DrawSnapshot; pocket?:number; resolvedAt?:number} };
+export type Ticket = { id: number; kind: 'normal' | 'jpc' | 'mini' | 'station'; result?: Result; elapsed: number; applied: boolean; physical?: boolean; plan?: DrawPlan; drawSave?: DrawSnapshot; refit?:JPRefit; resolvedAt?: number; route?:number; stampApplied?:boolean; routeCompleted?:boolean; kitGranted?:boolean; qualifier?: {plan:DrawPlan<string>; drawSave?:DrawSnapshot; pocket?:number; resolvedAt?:number} };
 export type Payout = { id: number; remaining: number; total: number };
 export type FeedQueue = { remaining: number; nextAt: number; automatic: boolean; deadline: number | null };
 export type GameState = {
@@ -117,7 +117,16 @@ export class Game {
   }
   completeQualifier(id:number,pocket:number){
     const a=this.state.active;if(!a?.qualifier||a.id!==id||a.qualifier.pocket!==undefined||!Number.isInteger(pocket)||pocket<0||pocket>9)return false;
-    a.qualifier.pocket=pocket;a.qualifier.resolvedAt=a.elapsed;a.route=pocket%3;this.onSound('event');
+    a.qualifier.pocket=pocket;a.qualifier.resolvedAt=a.elapsed;
+    const route=routeInfo[a.qualifier.plan.labels[pocket] as RouteEffect];
+    a.route=route?.route??pocket%3;
+    // Older saved qualifiers retain their old rules; a new route has a real benefit.
+    if(route&&a.refit){
+      if(route.route===0)a.refit.slots=Math.min(5,a.refit.slots+1);
+      else if(route.route===1)a.refit.maxBalls++;
+      else if(a.refit.shield)this.payout(10);else a.refit.shield=true;
+    }
+    this.onSound('event');
     this.onDurableChange();this.onChange();return true;
   }
   private beginUpgrade(a:Ticket){
@@ -177,12 +186,12 @@ export class Game {
     if (!s.active && s.queue.length) {
       const ticket = s.queue.shift()!;
       if(this.cinematic&&ticket.kind==='jpc'){
-        ticket.physical=true;ticket.plan=makePlan(()=>this.random[2].next());ticket.qualifier={plan:makePlan(()=>this.random[2].next())};
+        ticket.physical=true;ticket.plan=makePlan(()=>this.random[2].next());ticket.qualifier={plan:makeRoutePlan(()=>this.random[2].next())};
         const kit=s.jpItems??{lights:0,charts:0,shields:0},rescue=(s.jpFailures??0)>=3;
         ticket.refit={slots:1+kit.lights+(rescue?1:0),shield:kit.shields>0,maxBalls:3+kit.charts,attempts:[],phase:'refit',message:'灯台をともして、特別便の準備をしよう。',who:'nagi'};
         s.jpItems={lights:0,charts:0,shields:0};if(rescue)s.jpFailures=0;
       }
-      else if(ticket.kind!=='mini')ticket.result = draw(this.random[ticket.kind === 'jpc' ? 2 : 0], ticket.kind === 'jpc' ? JPC : NORMAL);
+      else if(ticket.kind!=='mini')ticket.result = draw(this.random[ticket.kind === 'jpc' ? 2 : 0], ticket.kind === 'jpc' ? JPC : ticket.kind==='station'?stationTables[ticket.route??0]:NORMAL);
       s.active = ticket;
       this.onDurableChange(); this.onChange();
     }
@@ -206,7 +215,7 @@ export class Game {
     if (a.elapsed >= reveal && !a.applied) {
       this.apply(a); this.onDurableChange(); this.onChange();
     }
-    if (a.elapsed > reveal + (this.cinematic ? 4.8 : 2.4)) { s.active = null; this.onDurableChange(); this.onChange(); }
+    if (a.elapsed > reveal + (this.cinematic ? resultDuration(a) : 2.4)) { s.active = null; this.onDurableChange(); this.onChange(); }
   }
   resolveDraw(id:number,result:Result){
     const a=this.state.active;

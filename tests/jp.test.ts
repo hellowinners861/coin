@@ -7,6 +7,8 @@ import {makeUpgradePlan,type UpgradeEffect} from '../src/events/jp.ts';
 
 function start(g=new Game(undefined,915)){
  g.cinematic=true;g.enqueue('jpc');g.tick(5.4);const a=g.state.active!;
+ // Exercise the base refit independently of the new route benefit.
+ a.qualifier!.plan=makePlan(()=>g.random[2].next());
  assert.equal(g.completeQualifier(a.id,2),true);g.tick(2.4);return g;
 }
 function hit(g:Game,e:UpgradeEffect){

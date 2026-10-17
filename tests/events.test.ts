@@ -4,6 +4,7 @@ import RAPIER from '@dimforge/rapier3d-compat';
 import {Game,Random} from '../src/game.ts';
 import {PhysicalDraw,makePlan} from '../src/events/draw.ts';
 import {idle,diaries,outcome} from '../src/events/scripts.ts';
+import {stops} from '../src/events/challenge.ts';
 
 test('physical JP plans have exactly seven tens, two thirties and one JP',()=>{
  const rng=new Random(8271),counts=Array.from({length:10},()=>({CREDIT_10:0,FIELD_30:0,JACKPOT:0}));
@@ -22,7 +23,7 @@ test('physical ticket cannot be paid or skipped before a real result; resolve an
 });
 test('movies do not change normal rewards; diaries pause queued tickets and replay is not an award',()=>{
  const g=new Game(undefined,61);g.cinematic=true;g.enqueue('normal');g.tick(.1);const result=g.state.active!.result;
- const saved=g.export();const copy=new Game(saved);copy.cinematic=true;copy.tick(8.4);assert.equal(copy.state.active!.result,result);const payout=copy.state.payouts.length;copy.tick(.1);assert.equal(copy.state.payouts.length,payout);
+ const saved=g.export();const copy=new Game(saved);copy.cinematic=true;copy.tick(stops(copy.state.active!)[2]);assert.equal(copy.state.active!.result,result);const payout=copy.state.payouts.length;copy.tick(.1);assert.equal(copy.state.payouts.length,payout);
  copy.skip();copy.state.theater={ticket:0,position:'center',journal:0,journalTime:0};copy.enqueue('normal');copy.tick(100);assert.equal(copy.state.active,null);assert.equal(copy.state.queue.length,1);assert.equal(copy.state.payouts.length,payout);
 });
 test('ball worlds restore the same pocket and all ten pockets are reachable',async()=>{
@@ -53,21 +54,21 @@ test('each mini-ball owns one prepaid event; route choice and save cannot duplic
  assert.deepEqual(copy.state.deliveryStamps,[0,1,0]);assert.equal(copy.state.payouts.length,1);assert.equal(copy.state.wallet,100);assert.equal(copy.state.won,0);assert.equal(copy.state.balls,0);
  assert.equal(copy.random[0].value,normalRng);assert.equal(copy.random[2].value,jpRng);
 });
-test('three stamps on one route open one station challenge using the requested normal table',()=>{
+test('three stamps open a station challenge with a guaranteed reward',()=>{
  const g=new Game(undefined,7);g.cinematic=true;
  for(let i=0;i<3;i++){g.collectMiniBall();g.tick(.1);assert.equal(g.chooseMiniRoute(g.state.active!.id,2),true);g.skip();}
  assert.deepEqual(g.state.deliveryStamps,[0,0,0]);assert.deepEqual(g.state.deliveryCompleted,[0,0,1]);assert.equal(g.state.queue.length,1);assert.equal(g.state.queue[0].kind,'station');assert.equal(g.state.queue[0].route,2);
- assert.equal(g.state.payouts.reduce((n,p)=>n+p.total,0),30);g.random[0].next=()=>0;g.tick(.1);assert.equal(g.state.active!.result,'NONE');g.skip();assert.equal(g.state.payouts.reduce((n,p)=>n+p.total,0),30);
+ assert.equal(g.state.payouts.reduce((n,p)=>n+p.total,0),30);g.random[0].next=()=>0;g.tick(.1);assert.equal(g.state.active!.result,'CREDIT_10');g.skip();assert.equal(g.state.payouts.reduce((n,p)=>n+p.total,0),40);
 });
 test('mini events autoplay and skip retain the stamp; staged reel stops do not reroll',()=>{
  const g=new Game(undefined,2);g.cinematic=true;g.collectMiniBall();g.tick(.1);g.tick(5);assert.equal(g.state.active!.stampApplied,true);g.skip();assert.equal(g.state.deliveryStamps!.reduce((a,b)=>a+b,0),1);
  g.enqueue('normal');g.tick(.1);const a=g.state.active!,rng=g.random[0].value;
- g.advancePresentation(a.id);assert.equal(a.elapsed,2.4);g.advancePresentation(a.id);assert.equal(a.elapsed,4.2);g.advancePresentation(a.id);assert.equal(a.elapsed,8.4);g.tick(.01);
+ for(const t of stops(a)){g.advancePresentation(a.id);assert.equal(a.elapsed,t);}g.tick(.01);
  assert.equal(g.random[0].value,rng);assert.equal(a.applied,true);
 });
 test('a legacy saved two-ball JP keeps its original flow and settles exactly once',async()=>{
  await RAPIER.init();const g=new Game(undefined,827);g.cinematic=true;g.enqueue('jpc');g.tick(5.4);const a=g.state.active!;
- delete a.refit; // Prior released saves have no refit state; do not retrofit an in-flight ball.
+ delete a.refit;a.qualifier!.plan=makePlan(()=>g.random[2].next()); // Keep a genuine legacy plan.
  const first=new PhysicalDraw(a.qualifier!.plan);while(first.pocket===null&&first.elapsed<24)first.step(1/60);assert.notEqual(first.pocket,null);
  a.qualifier!.drawSave=first.export();assert.equal(g.completeQualifier(a.id,first.pocket!),true);first.dispose();assert.equal(g.state.payouts.length,0);assert.equal(g.resolveDraw(a.id,'JACKPOT'),false);
  const copy=new Game(g.export());copy.cinematic=true;copy.tick(2.5);const b=copy.state.active!,plan={...b.plan!,seed:(b.plan!.seed+Math.imul(b.route!,2654435761))>>>0};
@@ -78,6 +79,6 @@ test('a legacy saved two-ball JP keeps its original flow and settles exactly onc
 
 test('reel presentation never shows a winning triple for NONE or changes the awarded result',async()=>{
  const {reelLabels}=await import('../src/events/challenge.ts');
- for(let id=1;id<=6;id++){const a={id,kind:'normal' as const,result:'NONE' as const,elapsed:9,applied:true};const labels=reelLabels(a);assert.equal(labels[0],labels[1]);assert.notEqual(labels[2],labels[0]);assert.equal(a.result,'NONE');}
+ for(let id=1;id<=6;id++){const a={id,kind:'normal' as const,result:'NONE' as const,elapsed:9,applied:true};const labels=reelLabels(a);assert.equal(new Set(labels).size,3);assert.equal(a.result,'NONE');}
  const win=reelLabels({id:9,kind:'normal',result:'JACKPOT_DIRECT',elapsed:9,applied:true});assert.deepEqual(win,['JP','JP','JP']);
 });
