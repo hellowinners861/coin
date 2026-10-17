@@ -1,12 +1,12 @@
 import { Game, type Ticket } from '../game';
 import { RESULT_LABELS } from '../config';
 import { PhysicalDraw,type DrawPlan,type DrawSnapshot } from './draw';
-import { DrawView } from './draw-view';
+import { DrawView,pocketStyle } from './draw-view';
 import { at,diaries,idle,intro,jpIntro,names,outcome,type Cut,type Character } from './scripts';
 import './theater.css';
 import './compact-monitor.css';
 import {routes,progressPhase,reelLabels,revealTime,stops} from './challenge';
-import { REFIT_CHOICE_SECONDS } from './jp';
+import { REFIT_CHOICE_SECONDS,routeInfo,type RouteEffect } from './jp';
 const asset=(name:string)=>new URL(`events/${name}.webp`,document.baseURI).href;
 const positions={normal:'0% 0%',surprise:'100% 0%',joy:'0% 100%',sad:'100% 100%'};
 export class Theater {
@@ -27,6 +27,9 @@ export class Theater {
    <section class="draw-window" aria-label="特別便のボール抽選" hidden><header class="movie-bar"><span>特別便のドック</span><div><button type="button" data-action="watch-story">物語へ</button></div></header><div class="jp-meter"><span></span><div class="jp-pockets" aria-hidden="true">${Array(10).fill('<i></i>').join('')}</div></div><div class="draw-surface" role="img" aria-label="10個の穴と白い抽選球。球が入った穴の報酬を獲得"></div><div class="draw-note" aria-live="polite"></div><div class="refit-actions" hidden><button type="button" data-refit="depart">この状態で出航</button><button type="button" data-refit="continue">もう1球</button></div><button type="button" class="retry-draw" hidden>球を入れ直す</button></section>
    <div class="mini-letter" role="status" hidden>ミナ：小さな便、到着！<br>10枚を左から払い出します</div>`;
   host.append(this.root);this.story=this.root.querySelector('.story-window')!;this.drawWindow=this.root.querySelector('.draw-window')!;this.surface=this.root.querySelector('.draw-surface')!;
+  const info=document.createElement('div');info.className='draw-info';
+  info.append(this.drawWindow.querySelector('.jp-meter')!,this.drawWindow.querySelector('.draw-note')!,this.drawWindow.querySelector('.refit-actions')!,this.drawWindow.querySelector('.retry-draw')!);this.drawWindow.append(info);
+  this.surface.innerHTML='<div class="draw-hud"></div><div class="draw-result" hidden></div>';
   // Controls live outside the picture, rather than covering the characters.
   this.story.append(this.story.querySelector('.event-machine')!,this.story.querySelector('.mini-choice')!);
   this.story.querySelector('.story-picture')!.prepend(this.root.querySelector('.dispatch-ledger')!);
@@ -74,9 +77,9 @@ export class Theater {
   // Layout coordinates do not rotate with the paper actor; its bubble stays still.
   const head={nagi:{normal:.08,surprise:.05,joy:.07,sad:.16},mina:{normal:.07,surprise:.06,joy:.12,sad:.13},garo:{normal:.07,surprise:.05,joy:.06,sad:.12}}[this.currentCut.who][this.currentCut.pose];
   const cast=actor.parentElement!;
-  speech.style.width=`${Math.min(300,w-12)}px`;speech.style.maxHeight=`${Math.max(20,picture.clientHeight-46)}px`;
+  speech.style.width=`${Math.min(330,w-16)}px`;speech.style.maxHeight=`${Math.max(20,picture.clientHeight-46)}px`;
   speech.style.setProperty('--speech-text-height',`${Math.max(14,picture.clientHeight-54)}px`);
-  cast.style.top=`${Math.min(picture.clientHeight-20,speech.offsetHeight+30)}px`;
+  cast.style.top=`${Math.min(picture.clientHeight-20,speech.offsetHeight+36)}px`;
   const x=cast.offsetLeft+actor.offsetLeft+actor.offsetWidth/2,y=cast.offsetTop+actor.offsetTop+actor.offsetHeight*head;
   const left=Math.max(8,Math.min(w-speech.offsetWidth-8,x-speech.offsetWidth/2));
   speech.style.left=`${left}px`;speech.style.top=`${Math.max(22,y-speech.offsetHeight-10)}px`;
@@ -120,11 +123,17 @@ export class Theater {
        else {const result=this.draw!.result;if(result==='CREDIT_10'||result==='FIELD_30'||result==='JACKPOT')this.game.resolveDraw(a.id,result);}
      }
    }
-   this.drawView!.update();
+   this.drawView!.update(dt);
    this.drawWindow.setAttribute('aria-label',target.mode==='route'?'第1球・航路抽選':target.mode==='refit'?'改装チャレンジ':r?'第3段階・最終抽選':'第2球・最終抽選');
    const note=this.root.querySelector<HTMLElement>('.draw-note')!;
    const slots=r?.slots??1;
-   note.textContent=a.applied?`${RESULT_LABELS[a.result!].title}${a.refit&&a.result!=='JACKPOT'?` · 再出航 ${this.game.state.jpFailures??0}/3`:''}`:target.mode==='route'?(q!.pocket!==undefined?`${routes[a.route!].name}航路へ！ 次は${r?'改装チャレンジ':'最終抽選'}。`:'第1球：1 灯台／2 海路／3 工房'):target.mode==='refit'?(r!.phase==='refit'?'改装：JP＋1×3／＋2×1／突風×2／補強×1／10枚×2／出航×1':`${r!.message}${r!.phase==='choice'?` あと${Math.max(0,Math.ceil(REFIT_CHOICE_SECONDS-a.elapsed+r!.decisionAt!))}秒で自動出航。`:' 最終ゲートへ。'}`):`最終抽選 · 10枚×${8-slots}／30枚×2／JP×${slots}`;
+   const routeBonus=q?.pocket===undefined?undefined:routeInfo[q.plan.labels[q.pocket] as RouteEffect];
+   this.drawWindow.querySelector('.movie-bar>span')!.textContent=target.mode==='route'?'01 / 航路を決める':target.mode==='refit'?'02 / 灯台を改装する':'03 / JACKPOT CHANCE';
+   const hit=this.draw!.pocket,result=this.surface.querySelector<HTMLElement>('.draw-result')!;
+   result.hidden=hit===null;result.textContent=hit===null?'':target.mode==='prize'?RESULT_LABELS[this.draw!.result as keyof typeof RESULT_LABELS].title:pocketStyle(this.draw!.plan.labels[hit],target.mode,hit).text+' に入賞';
+   this.surface.querySelector('.draw-hud')!.textContent=hit!==null?'入賞確定':this.draw!.gates.length?`ゲート開放まで ${Math.max(0,3.2-this.draw!.elapsed).toFixed(1)}秒`:'球の行方を見届けよう';
+   this.surface.setAttribute('aria-label',`10穴の物理抽選。現在の配置：${this.draw!.plan.labels.map((label,i)=>pocketStyle(label,target.mode,i).text).join('、')}`);
+   note.textContent=a.applied?`${RESULT_LABELS[a.result!].title}${a.refit&&a.result!=='JACKPOT'?` · 再出航 ${this.game.state.jpFailures??0}/3`:''}`:target.mode==='route'?(q!.pocket!==undefined?`${routes[a.route!].name}航路へ！ ${routeBonus?.benefit??''}\n次は${r?'改装チャレンジ':'最終抽選'}。`:'灯台：JP＋1\n海路：改装＋1球\n工房：補強1個\n球が入った航路の恩恵を獲得。'):target.mode==='refit'?(r!.phase==='refit'?'灯り＋1：30% ／ ＋2：10%\n突風−1：20% ／ 補強：10%\n10枚：20% ／ 出航：10%':`${r!.message}${r!.phase==='choice'?`\n続けると突風20%。\nあと${Math.max(0,Math.ceil(REFIT_CHOICE_SECONDS-a.elapsed+r!.decisionAt!))}秒で自動出航。`:' 最終ゲートへ。'}`):`最終抽選 · 10枚×${8-slots}／30枚×2／JP×${slots}`;
    if(this.draw!.elapsed>=24&&this.draw!.pocket===null&&!a.applied)note.textContent='球が止まりました。同じ配置で入れ直せます。';
    this.root.querySelector<HTMLElement>('.retry-draw')!.hidden=this.draw!.elapsed<24||this.draw!.pocket!==null||a.applied;
    this.root.querySelector<HTMLElement>('.refit-actions')!.hidden=!r||r.phase!=='choice'||a.applied;
@@ -157,7 +166,7 @@ export class Theater {
   }
   const machine=this.root.querySelector<HTMLElement>('.event-machine')!,choices=this.root.querySelector<HTMLElement>('.mini-choice')!;
   machine.hidden=!a||!['normal','station'].includes(a.kind)||a.applied;
-  if(a&&!machine.hidden){machine.classList.toggle('reach',a.elapsed>=stops(a)[1]);const labels=reelLabels(a);machine.querySelectorAll<HTMLElement>('.reel-strip span').forEach((el,i)=>{el.textContent=labels[i];el.classList.toggle('stopped',a.elapsed>=stops(a)[i]);});}
+  if(a&&!machine.hidden){machine.classList.toggle('reach',a.elapsed>=stops(a)[1]&&a.result!=='NONE'&&a.result!=='FIELD_5'&&a.result!=='CREDIT_10');const labels=reelLabels(a);machine.querySelectorAll<HTMLElement>('.reel-strip span').forEach((el,i)=>{el.textContent=labels[i];el.classList.toggle('stopped',a.elapsed>=stops(a)[i]);});}
   if(a?.kind==='mini'&&!a.stampApplied)stamp.hidden=true;
   choices.hidden=a?.kind!=='mini'||!!a.stampApplied;
   choices.querySelectorAll<HTMLButtonElement>('[data-route]').forEach((button,i)=>button.textContent=`${routes[i].name} ${this.game.state.deliveryStamps?.[i]??0}/3`);
@@ -177,5 +186,5 @@ export class Theater {
   ledger.setAttribute('style',`visibility:${notice.hidden?'visible':'hidden'}`);
   this.layout();
  }
- get overlay(){if(!this.drawView||this.drawWindow.hidden)return undefined;return {scene:this.drawView.scene,camera:this.drawView.camera,element:this.surface};}
+ get overlay(){if(!this.drawView||this.drawWindow.hidden)return undefined;return {scene:this.drawView.scene,camera:this.drawView.camera,element:this.surface,fit:(aspect:number)=>this.drawView!.fit(aspect)};}
 }

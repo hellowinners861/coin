@@ -1,6 +1,18 @@
 import { shuffledPlan,type DrawPlan,type DrawSnapshot } from './draw';
 import type { Character } from './scripts';
 
+export type RouteEffect='LIGHTHOUSE'|'SEA'|'WORKSHOP';
+export const routeInfo:Record<RouteEffect,{route:number;short:string;color:string;benefit:string}>={
+ LIGHTHOUSE:{route:0,short:'灯台',color:'#f5cf79',benefit:'JPマス＋1'},
+ SEA:{route:1,short:'海路',color:'#92d5eb',benefit:'改装の上限＋1球'},
+ WORKSHOP:{route:2,short:'工房',color:'#a5d5b5',benefit:'補強1個・所持済みなら10枚'},
+};
+export function makeRoutePlan(next:()=>number):DrawPlan<RouteEffect>{
+ // Rotate the tenth hole across routes, then shuffle independently of launch.
+ const labels:RouteEffect[]=['LIGHTHOUSE','SEA','WORKSHOP'];
+ return shuffledPlan([...labels,...labels,...labels,labels[Math.floor(next()*3)]],next);
+}
+
 export type UpgradeEffect='LIGHT'|'BEACON'|'WIND'|'SHIELD'|'CARGO'|'DEPART';
 export const upgradeInfo:Record<UpgradeEffect,{label:string;symbol:string;color:string;who:Character}>={
  LIGHT:{label:'灯りがともる · JP＋1',symbol:'JP+1',color:'#efd38a',who:'nagi'},
