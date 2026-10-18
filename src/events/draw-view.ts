@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { floorMesh,pockets,PhysicalDraw } from './draw';
+import { floorMesh,bowlHeight,pockets,PhysicalDraw } from './draw';
 import { upgradeInfo,routeInfo,type UpgradeEffect,type RouteEffect } from './jp';
 
 export function pocketStyle(label:string,mode:'route'|'refit'|'prize',index:number){
@@ -22,14 +22,15 @@ export class DrawView {
   const ring=<M extends THREE.Material>(radius:number,tube:number,y:number,material:M)=>{
    const mesh=new THREE.Mesh(new THREE.TorusGeometry(radius,tube,12,128),material);mesh.rotation.x=Math.PI/2;mesh.position.y=y;this.scene.add(mesh);return mesh;
   };
-  const drum=new THREE.Mesh(new THREE.CylinderGeometry(.89,.84,.16,128),navy);drum.position.y=-.17;this.scene.add(drum);
-  ring(.87,.022,-.08,brass);ring(.85,.008,-.045,steel);
+  const expanded=draw.motionVersion>=2,outer=expanded?1.13:.89,wallRadius=expanded?.93:.66,edgeY=expanded?.21:-.08;
+  const drum=new THREE.Mesh(new THREE.CylinderGeometry(outer,outer-.05,.16,128),navy);drum.position.y=-.17;this.scene.add(drum);
+  ring(outer-.02,.022,edgeY,brass);ring(outer-.04,.008,edgeY+.035,steel);
   // Actual bowl and its ten openings use the same geometry as the collider.
-  const m=floorMesh(),g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(m.vertices,3));g.setIndex(new THREE.BufferAttribute(m.indices,1));g.computeVertexNormals();
+  const m=floorMesh(!expanded),g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(m.vertices,3));g.setIndex(new THREE.BufferAttribute(m.indices,1));g.computeVertexNormals();
   this.scene.add(new THREE.Mesh(g,new THREE.MeshStandardMaterial({color:'#173c4b',metalness:.38,roughness:.4,side:THREE.DoubleSide})));
-  ring(.668,.021,.04,brass);ring(.68,.008,.11,steel);
-  const wall=new THREE.Mesh(new THREE.CylinderGeometry(.66,.66,.18,128,1,true),new THREE.MeshPhysicalMaterial({color:'#d5eaf5',transparent:true,opacity:.12,roughness:.12,side:THREE.DoubleSide,depthWrite:false}));
-  wall.position.y=.055;this.scene.add(wall);
+  ring(wallRadius+.008,.021,expanded?.19:.04,brass);ring(wallRadius+.02,.008,expanded?.32:.11,steel);
+  const wall=new THREE.Mesh(new THREE.CylinderGeometry(wallRadius,wallRadius,.18,128,1,true),new THREE.MeshPhysicalMaterial({color:'#d5eaf5',transparent:true,opacity:.12,roughness:.12,side:THREE.DoubleSide,depthWrite:false}));
+  wall.position.y=expanded?.23:.055;this.scene.add(wall);
   ring(.28,.002,.063,brass);ring(.25,.002,.069,brass);
   // Engraved compass at the centre, kept flush with the physical slope.
   const compass=new THREE.Group();this.scene.add(compass);
@@ -40,9 +41,9 @@ export class DrawView {
   this.orbit=new THREE.Group();this.scene.add(this.orbit);
   for(let i=0;i<80;i++){const a=i*Math.PI/40,major=i%8===0;
    const marker=new THREE.Mesh(new THREE.BoxGeometry(major?.014:.006,.004,major?.035:.014),major?brass:steel);
-   marker.position.set(Math.cos(a)*.84,-.035,Math.sin(a)*.84);marker.rotation.y=-a+Math.PI/2;this.scene.add(marker);
+   marker.position.set(Math.cos(a)*(outer-.05),edgeY+.045,Math.sin(a)*(outer-.05));marker.rotation.y=-a+Math.PI/2;this.scene.add(marker);
   }
-  for(let i=0;i<3;i++){const light=new THREE.Mesh(new THREE.SphereGeometry(.012,8,6),new THREE.MeshBasicMaterial({color:'#91d5e9'}));const a=i*Math.PI*2/3;light.position.set(Math.cos(a)*.854,-.025,Math.sin(a)*.854);this.orbit.add(light);}
+  for(let i=0;i<3;i++){const light=new THREE.Mesh(new THREE.SphereGeometry(.012,8,6),new THREE.MeshBasicMaterial({color:'#91d5e9'}));const a=i*Math.PI*2/3;light.position.set(Math.cos(a)*(outer-.036),edgeY+.055,Math.sin(a)*(outer-.036));this.orbit.add(light);}
   pockets.forEach((p,i)=>{
    const style=pocketStyle(draw.plan.labels[i],mode,i);
    const rim=ring(.145,.014,.017,new THREE.MeshStandardMaterial({color:style.color,metalness:.65,roughness:.28,emissive:style.color,emissiveIntensity:.05}));
@@ -58,7 +59,7 @@ export class DrawView {
    const tex=new THREE.CanvasTexture(canvas);tex.colorSpace=THREE.SRGBColorSpace;
    void document.fonts.load('600 50px "Noto Sans JP"',style.text).then(()=>{if(!this.disposed){paint();tex.needsUpdate=true;}},()=>{});
    const label=new THREE.Sprite(new THREE.SpriteMaterial({map:tex,depthTest:true,toneMapped:false}));
-   label.scale.set(.255,.112,1);label.position.set(p.x*1.48,.07,p.z*1.48);this.scene.add(label);this.labels.push(label);
+   label.scale.set(.255,.112,1);label.position.set(p.x*(expanded?2.04:1.48),expanded?.25:.07,p.z*(expanded?2.04:1.48));this.scene.add(label);this.labels.push(label);
   });
   this.ball=new THREE.Mesh(new THREE.SphereGeometry(.048,32,24),new THREE.MeshPhysicalMaterial({color:'#fff5d8',metalness:.24,roughness:.15,clearcoat:1,clearcoatRoughness:.08}));this.scene.add(this.ball);
   const stripe=new THREE.Mesh(new THREE.TorusGeometry(.0478,.004,6,40),metal('#a74336',.4));this.ball.add(stripe);
@@ -70,14 +71,14 @@ export class DrawView {
  }
  fit(aspect:number){
   // Fit the entire cabinet at any monitor aspect ratio, including portrait.
-  this.camera.aspect=aspect;const distance=Math.max(2.65,2.65/Math.max(.55,aspect));
-  this.camera.position.set(0,distance*.92,distance*.39);this.camera.lookAt(0,0,0);this.camera.updateProjectionMatrix();
+  this.camera.aspect=aspect;const framing=this.draw.motionVersion>=2?3.5:2.65,distance=Math.max(framing,framing/Math.max(.1,aspect));
+  this.camera.position.set(0,distance*.92,distance*.39);this.camera.lookAt(0,this.draw.motionVersion>=2?.06:0,0);this.camera.updateProjectionMatrix();
  }
  update(dt=1/60){
   this.clock+=dt;const reduced=typeof matchMedia==='function'&&matchMedia('(prefers-reduced-motion: reduce)').matches;
   this.gates.forEach(g=>{g.visible=this.draw.gates.length>0;});
   const p=this.draw.ball.translation();this.ball.position.set(p.x,Math.max(-.2,p.y),p.z);this.ball.quaternion.copy(this.draw.ball.rotation());
-  this.shadow.position.set(p.x,.113-.11*Math.min(1,Math.hypot(p.x,p.z)/.64),p.z);this.shadow.visible=p.y>=0;
+  this.shadow.position.set(p.x,this.draw.motionVersion>=2?bowlHeight(p.x,p.z)+.003:.113-.11*Math.min(1,Math.hypot(p.x,p.z)/.64),p.z);this.shadow.visible=p.y>=0;
   this.orbit.rotation.y=reduced?0:-this.clock*.28;
   const hit=this.draw.pocket;
   this.rims.forEach((rim,i)=>{rim.material.emissiveIntensity=hit===i?(reduced?.5:.5+.25*Math.sin(this.clock*5)):.05;this.labels[i].material.opacity=hit===null||hit===i?1:.5;});

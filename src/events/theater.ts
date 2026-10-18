@@ -77,9 +77,9 @@ export class Theater {
   // Layout coordinates do not rotate with the paper actor; its bubble stays still.
   const head={nagi:{normal:.08,surprise:.05,joy:.07,sad:.16},mina:{normal:.07,surprise:.06,joy:.12,sad:.13},garo:{normal:.07,surprise:.05,joy:.06,sad:.12}}[this.currentCut.who][this.currentCut.pose];
   const cast=actor.parentElement!;
-  speech.style.width=`${Math.min(330,w-16)}px`;speech.style.maxHeight=`${Math.max(20,picture.clientHeight-46)}px`;
-  speech.style.setProperty('--speech-text-height',`${Math.max(14,picture.clientHeight-54)}px`);
-  cast.style.top=`${Math.min(picture.clientHeight-20,speech.offsetHeight+36)}px`;
+  speech.style.width=`${Math.min(330,w-16)}px`;speech.style.maxHeight=`${Math.max(20,picture.clientHeight*.44-12)}px`;
+  speech.style.setProperty('--speech-text-height',`${Math.max(14,picture.clientHeight*.44-38)}px`);
+  cast.style.top=`${Math.max(30,picture.clientHeight*.44)}px`;
   const x=cast.offsetLeft+actor.offsetLeft+actor.offsetWidth/2,y=cast.offsetTop+actor.offsetTop+actor.offsetHeight*head;
   const left=Math.max(8,Math.min(w-speech.offsetWidth-8,x-speech.offsetWidth/2));
   speech.style.left=`${left}px`;speech.style.top=`${Math.max(22,y-speech.offsetHeight-10)}px`;
@@ -131,7 +131,7 @@ export class Theater {
    this.drawWindow.querySelector('.movie-bar>span')!.textContent=target.mode==='route'?'01 / 航路を決める':target.mode==='refit'?'02 / 灯台を改装する':'03 / JACKPOT CHANCE';
    const hit=this.draw!.pocket,result=this.surface.querySelector<HTMLElement>('.draw-result')!;
    result.hidden=hit===null;result.textContent=hit===null?'':target.mode==='prize'?RESULT_LABELS[this.draw!.result as keyof typeof RESULT_LABELS].title:pocketStyle(this.draw!.plan.labels[hit],target.mode,hit).text+' に入賞';
-   this.surface.querySelector('.draw-hud')!.textContent=hit!==null?'入賞確定':this.draw!.gates.length?`ゲート開放まで ${Math.max(0,3.2-this.draw!.elapsed).toFixed(1)}秒`:'球の行方を見届けよう';
+   this.surface.querySelector('.draw-hud')!.textContent=hit!==null?'入賞確定':this.draw!.gates.length?(this.draw!.elapsed<3?'高速周回中': '減速中 · まもなくゲート開放'):'球の行方を見届けよう';
    this.surface.setAttribute('aria-label',`10穴の物理抽選。現在の配置：${this.draw!.plan.labels.map((label,i)=>pocketStyle(label,target.mode,i).text).join('、')}`);
    note.textContent=a.applied?`${RESULT_LABELS[a.result!].title}${a.refit&&a.result!=='JACKPOT'?` · 再出航 ${this.game.state.jpFailures??0}/3`:''}`:target.mode==='route'?(q!.pocket!==undefined?`${routes[a.route!].name}航路へ！ ${routeBonus?.benefit??''}\n次は${r?'改装チャレンジ':'最終抽選'}。`:'灯台：JP＋1\n海路：改装＋1球\n工房：補強1個\n球が入った航路の恩恵を獲得。'):target.mode==='refit'?(r!.phase==='refit'?'灯り＋1：30% ／ ＋2：10%\n突風−1：20% ／ 補強：10%\n10枚：20% ／ 出航：10%':`${r!.message}${r!.phase==='choice'?`\n続けると突風20%。\nあと${Math.max(0,Math.ceil(REFIT_CHOICE_SECONDS-a.elapsed+r!.decisionAt!))}秒で自動出航。`:' 最終ゲートへ。'}`):`最終抽選 · 10枚×${8-slots}／30枚×2／JP×${slots}`;
    if(this.draw!.elapsed>=24&&this.draw!.pocket===null&&!a.applied)note.textContent='球が止まりました。同じ配置で入れ直せます。';
