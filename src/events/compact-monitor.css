@@ -1,15 +1,15 @@
 /* Fixed 40% monitor, with controls outside the story and the physical bowl. */
 .event-dock{container-type:size;background:transparent}
 .event-dock .theater{padding:6px;min-height:0}
-.event-dock .story-window,.event-dock .story-window:has(.event-machine:not([hidden]),.mini-choice:not([hidden])){display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:30px minmax(0,1fr) auto;min-height:0;border:1px solid #71817d;border-radius:7px;touch-action:pan-y}
+.event-dock .story-window{display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:30px minmax(0,1fr) 48px;min-height:0;border:1px solid #71817d;border-radius:7px;touch-action:pan-y}
 .event-dock .movie-bar,.event-dock .upper .movie-bar{grid-column:1;grid-row:1;height:30px;min-height:0;padding:0 10px;font-size:11px;background:#102832;border-bottom:1px solid #c4aa6233}
 .event-dock .movie-title,.event-dock .draw-window .movie-bar>span{display:block!important;color:#ede2bf;white-space:nowrap;font-size:11px;letter-spacing:.08em}
 .event-dock .movie-bar button,.event-dock .upper .movie-bar button{min-height:30px;padding:2px 8px;font-size:10px}
 .event-dock .story-window .movie-bar>div{width:auto}
 .event-dock .story-picture{grid-column:1;grid-row:2;min-height:0;height:100%;aspect-ratio:auto}
 .event-dock .jp-inventory,.event-dock .event-stage,.event-dock .story-note{display:none}
-.event-dock .cast,.event-dock .upper .cast{left:3%;right:3%;bottom:0}
-.event-dock .paper-actor{max-height:180px;max-width:30%;height:100%}
+.event-dock .cast,.event-dock .upper .cast{left:3%;right:3%;bottom:0;container-type:size}
+.event-dock .paper-actor{height:auto;width:min(30cqw,100cqh);aspect-ratio:1}
 .event-dock .speech,.event-dock .upper .speech{font-size:clamp(11px,3cqw,15px);line-height:1.45;padding:5px 10px;overflow:visible;pointer-events:auto}
 .event-dock .speech b{display:block;font-size:9px;line-height:1.2}
 .event-dock .speech span{display:block;max-height:var(--speech-text-height);overflow:auto}
@@ -25,7 +25,7 @@
 .event-dock .draw-window.upper .movie-bar{grid-column:1/-1;grid-row:1;display:flex}
 .event-dock .draw-window .movie-bar>span{min-width:0;overflow:hidden;text-overflow:ellipsis}
 .event-dock .draw-window .movie-bar>div{flex:0 0 auto}
-.event-dock .draw-surface{grid-column:1;grid-row:2;height:100%;min-height:0;position:relative}
+.event-dock .draw-surface{grid-column:1;grid-row:2;height:100%;min-height:0;min-width:0;position:relative;overflow:hidden}
 .draw-hud{position:absolute;left:4px;right:4px;top:4px;text-align:center;pointer-events:none;font-size:9px;letter-spacing:.06em;color:#e8d6ac;text-shadow:0 1px 3px #000}
 .draw-result{position:absolute;left:6px;right:6px;bottom:6px;text-align:center;pointer-events:none;padding:5px 3px;border:1px solid #d7b96a88;background:#0a2430ed;color:#fff0b5;font-size:13px;font-weight:600;border-radius:3px}
 .event-dock .draw-info{grid-column:2;grid-row:2;display:flex;flex-direction:column;min-width:0;min-height:0;padding:9px 8px;gap:7px;background:linear-gradient(115deg,#16313d,#10252d);border-left:1px solid #b89b5933;overflow:auto}
@@ -36,11 +36,11 @@
 .event-dock .refit-actions button{flex:0 0 auto;min-height:36px;border:1px solid #c4ab6b77;border-radius:3px;font-size:11px;padding:4px;background:#294a51}
 .event-dock .refit-actions button:last-child{background:#bca569;color:#102832}
 .event-dock .retry-draw{flex:0 0 auto;min-height:36px;height:auto;font-size:11px;border-radius:3px}
-.event-dock .draw-window:has(.refit-actions:not([hidden]),.retry-draw:not([hidden])) .jp-meter{display:flex}
+
 .event-dock .mini-letter{top:40px;left:12px;right:12px;max-height:24px;padding:3px 6px;font-size:10px;line-height:16px}
 @container(max-height:200px){
  .event-dock .theater{padding:3px}
- .event-dock .story-window,.event-dock .story-window:has(.event-machine:not([hidden]),.mini-choice:not([hidden])){grid-template-columns:minmax(0,2fr) minmax(116px,1fr);grid-template-rows:28px minmax(0,1fr)}
+ .event-dock .story-window{grid-template-columns:minmax(0,2fr) minmax(116px,1fr);grid-template-rows:28px minmax(0,1fr)}
  .event-dock .story-window .movie-bar{grid-column:1/-1}.event-dock .story-picture{grid-row:2;grid-column:1}
  .event-dock .event-machine,.event-dock .mini-choice{grid-column:2;grid-row:2;flex-direction:column;gap:2px}
  .event-dock .event-machine button{flex:0 0 32px;width:100%;min-height:32px}.event-dock .reel-strip span{font-size:10px;padding:3px}
