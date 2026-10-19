@@ -140,13 +140,13 @@ export class Game {
     const effect=attempt.plan.labels[pocket];r.who=upgradeInfo[effect].who;
     if(effect==='LIGHT'||effect==='BEACON'){
       const before=r.slots;r.slots=Math.min(5,r.slots+(effect==='LIGHT'?1:2));
-      r.message=r.slots===before?'灯台は全灯！ JPは5マスのままだよ。':`灯りがついた！ JP ${before} → ${r.slots}マス！`;
+      r.message=r.slots===before?'全部ついた！ JPは上限の5マスだよ。':`ついたぞ！ JPが${before}から${r.slots}マスに増えた！`;
     }else if(effect==='WIND'){
-      if(r.shield){r.shield=false;r.who='garo';r.message='補強が効いた。JPマスは守ったぞ。';}
-      else{const before=r.slots;r.slots=Math.max(1,r.slots-1);r.message=before===1?'強い風！ でも最後のJPマスは消えないよ。':`突風だ！ JP ${before} → ${r.slots}マス。`;}
-    }else if(effect==='SHIELD'){r.message=r.shield?'補強は万全。盾は1個まで持てるぞ。':'補強した。次の突風を1回防ぐぞ。';r.shield=true;}
-    else if(effect==='CARGO'){this.payout(10);r.message='積荷を発見！ 10枚を左から払い出すよ。';}
-    else r.message='準備完了！ この灯りで出航しよう。';
+      if(r.shield){r.shield=false;r.who='garo';r.message='補強しといて正解だ。JPマスは減らさせん。';}
+      else{const before=r.slots;r.slots=Math.max(1,r.slots-1);r.message=before===1?'危なかった！ 最後のJP1マスは残ってるわ。':`風にやられた！ JPは${before}から${r.slots}マスね。`;}
+    }else if(effect==='SHIELD'){r.message=r.shield?'もう補強してある。盾は1個で十分働くぞ。':'締めておいた。次の突風は1回受け止めるぞ。';r.shield=true;}
+    else if(effect==='CARGO'){this.payout(10);r.message='積荷を見つけたわ！ 左から10枚送るわよ。';}
+    else r.message='待たせたわね！ この灯りで出航するわよ。';
     r.phase='choice';r.decisionAt=a.elapsed;
     if(effect==='DEPART'||r.attempts.length>=r.maxBalls)this.depart(a);
     this.onSound('event');this.onDurableChange();this.onChange();return true;
@@ -188,7 +188,7 @@ export class Game {
       if(this.cinematic&&ticket.kind==='jpc'){
         ticket.physical=true;ticket.plan=makePlan(()=>this.random[2].next());ticket.qualifier={plan:makeRoutePlan(()=>this.random[2].next())};
         const kit=s.jpItems??{lights:0,charts:0,shields:0},rescue=(s.jpFailures??0)>=3;
-        ticket.refit={slots:1+kit.lights+(rescue?1:0),shield:kit.shields>0,maxBalls:3+kit.charts,attempts:[],phase:'refit',message:'灯台をともして、特別便の準備をしよう。',who:'nagi'};
+        ticket.refit={slots:1+kit.lights+(rescue?1:0),shield:kit.shields>0,maxBalls:3+kit.charts,attempts:[],phase:'refit',message:'僕が灯台をともすよ！ 特別便を迎えよう。',who:'nagi'};
         s.jpItems={lights:0,charts:0,shields:0};if(rescue)s.jpFailures=0;
       }
       else if(ticket.kind!=='mini')ticket.result = draw(this.random[ticket.kind === 'jpc' ? 2 : 0], ticket.kind === 'jpc' ? JPC : ticket.kind==='station'?stationTables[ticket.route??0]:NORMAL);
